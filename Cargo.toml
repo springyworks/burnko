@@ -142,4 +142,6 @@ systemstat = "0.2.3"
 
 
 [profile.dev]
-debug = 0 # Speed up compilation time and not necessary.
+# debug = 0 # Speed up compilation time and not necessary.
+# if you are new to this crate and want to experiment and debug code,
+#  defaulting to release instead of debug can be confusing
