@@ -709,6 +709,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "burn-show-image-of"
+version = "0.0.0"
+dependencies = [
+ "burn",
+ "burn-ndarray",
+ "image",
+]
+
+[[package]]
 name = "burn-tch"
 version = "0.14.0"
 dependencies = [
