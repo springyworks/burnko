@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
+#![allow(unused_imports)]
 // Import burn packages
 use burn::prelude::*;
 use burn::tensor::Distribution;
@@ -18,23 +19,26 @@ fn main() {
     let device = Default::default();
     // Create a random tensor
     let tensor_r: Tensor<B, 3> = Tensor::random([3, 32, 32], Distribution::Default, &device);
+    let tensor_rs = Tensor::<B, 1>::from_floats([1.0, 2.0, 3.0, 4.0], &device).reshape([2, 2]);
+    let tensor_bool = Tensor::<B, 1, Bool>::from_data([1, 0, 1, 1], &device);
 
-    let tensor_1  = Tensor::<B,2>::from_data([[2., 3.], [4., 5.]], &device);
-    let tensor_rs  =
-        Tensor::<B, 1>::from_floats([1.0, 2.0, 3.0, 4.0], &device).reshape([2, 2]);
+    // let tensor_1 = Tensor::<B, 3>::from_data([[20, 30], [40, 50]], &device);
+    // To use B,3 correctly, ensure that the dimensions and the type match the requirements for a 3-dimensional tensor.
+    // Assuming B is a valid type for the Tensor and the device is correctly defined,
+    // the data provided must be adjusted to fit a 3-dimensional structure.
 
-    //
-    let tensor_bool = tensor_1.bool();
-    let tensordata = tensor_bool.to_data();
+    let tensor_1 = Tensor::<B, 3, Int >::from_data([[[20], [30]], [[40], [50]]], &device);
+    let tensordata = tensor_1.to_data().bytes;
     println!("tensor_data = {:?}", &tensordata);
 
-
-    let img_buff = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(2, 2, tensordata.bytes).unwrap();
+   
+    let img_buff = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(2, 2, tensordata).unwrap();
 
     img_buff.save("image_dirext-of-tensor.jpg").unwrap();
-    img_buff
-        .save_with_format("image-of-tensor.tiff", image::ImageFormat::Tiff)
-        .unwrap();
+
+    // img_buff
+    // .save_with_format("image-of-tensor.tiff", image::ImageFormat::Tiff)
+    // .unwrap();
 
     print!("\nEnd of printing image of tensor\n");
 }

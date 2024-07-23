@@ -1,4 +1,4 @@
-# PRINT IMAGE OF 
+# SHOW IMAGE OF 
 
 > [Burn](https://github.com/tracel-ai/burn/examples) 
 
