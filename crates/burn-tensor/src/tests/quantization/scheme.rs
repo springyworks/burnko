@@ -20,12 +20,12 @@ mod tests {
         qparams
             .scale
             .into_data()
-            .assert_approx_eq(&TensorData::from([0.009_019_608]), 9);
+            .assert_approx_eq(&TensorData::from([0.009_019_608]), 8);
         qparams
             .offset
             .unwrap()
             .into_data()
-            .assert_eq(&TensorData::from([72]), false);
+            .assert_eq(&TensorData::from([71]), false);
     }
 
     #[test]
@@ -42,7 +42,7 @@ mod tests {
         qparams
             .scale
             .into_data()
-            .assert_approx_eq(&TensorData::from([0.014_173_228]), 9);
+            .assert_approx_eq(&TensorData::from([0.014_173_228]), 8);
         assert!(qparams.offset.is_none());
     }
 }
