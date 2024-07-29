@@ -31,7 +31,7 @@ fn to_image(
 
     let img_buff =
         ImageBuffer::<image::Rgb<u8>, Vec<u8>>::from_raw(height, width, tensor_data).unwrap();
-    return img_buff;
+   return img_buff;
 }
 
 type Bckend = NdArray<f32>;

@@ -715,6 +715,8 @@ dependencies = [
  "burn",
  "burn-ndarray",
  "image",
+ "ndarray",
+ "ratatui 0.27.0",
 ]
 
 [[package]]
@@ -764,7 +766,7 @@ dependencies = [
  "derive-new",
  "log",
  "nvml-wrapper",
- "ratatui",
+ "ratatui 0.26.3",
  "serde",
  "sysinfo",
  "systemstat",
@@ -4350,6 +4352,27 @@ dependencies = [
  "stability",
  "strum",
  "time",
+ "unicode-segmentation",
+ "unicode-truncate",
+ "unicode-width",
+]
+
+[[package]]
+name = "ratatui"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d16546c5b5962abf8ce6e2881e722b4e0ae3b6f1a08a26ae3573c55853ca68d3"
+dependencies = [
+ "bitflags 2.6.0",
+ "cassowary",
+ "compact_str",
+ "crossterm",
+ "itertools 0.13.0",
+ "lru",
+ "paste",
+ "stability",
+ "strum",
+ "strum_macros",
  "unicode-segmentation",
  "unicode-truncate",
  "unicode-width",

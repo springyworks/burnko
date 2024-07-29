@@ -15,6 +15,9 @@ default = ["burn/default"]
 burn = {path = "../../crates/burn", features = ["wgpu", "vision"]}
 
 burn-ndarray = {path = "../../crates/burn-ndarray"}
+ndarray = "0.15.3"
+ratatui = " 0.27.0"
+
 
 # The following dependencies are used for plotting
 image = " 0.25.1"
