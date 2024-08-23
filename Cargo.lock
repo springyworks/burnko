@@ -2554,6 +2554,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "guide_kosmod"
+version = "0.14.0"
+dependencies = [
+ "burn",
+ "log",
+ "serde",
+]
+
+[[package]]
 name = "h2"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
