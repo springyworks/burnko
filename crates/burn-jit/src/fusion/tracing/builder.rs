@@ -511,9 +511,19 @@ impl TraceBuilder {
                         &mut local_tensor_ids_input,
                         &mut local_tensor_ids_output,
                     ),
+                    Operator::Magnitude(op) => mark_unary(
+                        op,
+                        &mut local_tensor_ids_input,
+                        &mut local_tensor_ids_output,
+                    ),
                     Operator::AtomicCompareAndSwap(_op) => {
                         // Nothing to do.
                     }
+                    Operator::Dot(op) => mark_binary(
+                        op,
+                        &mut local_tensor_ids_input,
+                        &mut local_tensor_ids_output,
+                    ),
                 },
                 Operation::Procedure(proc) => {
                     match proc {
