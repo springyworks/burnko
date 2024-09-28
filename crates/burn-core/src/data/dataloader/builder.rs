@@ -17,14 +17,8 @@ where
     O: Send + Clone + std::fmt::Debug + 'static,
 {
     /// Creates a new data loader builder.
-    ///
-    /// # Arguments
-    ///
-    /// * `batcher` - The batcher.
-    ///
-    /// # Returns
-    ///
-    /// The data loader builder.
+    /// # Arguments * `batcher` - The batcher.
+    /// # Returns: The data loader builder.
     pub fn new<B>(batcher: B) -> Self
     where
         B: DynBatcher<I, O> + 'static,
