@@ -250,9 +250,11 @@ Those operations are only available for `Float` tensors.
 
 | Burn API                                     | PyTorch Equivalent                 |
 | -------------------------------------------- | ---------------------------------- |
+| `tensor.ceil()`                              | `tensor.ceil()`                    |
 | `tensor.cos()`                               | `tensor.cos()`                     |
 | `tensor.erf()`                               | `tensor.erf()`                     |
 | `tensor.exp()`                               | `tensor.exp()`                     |
+| `tensor.floor()`                             | `tensor.floor()`                   |
 | `tensor.from_floats(floats, device)`         | N/A                                |
 | `tensor.from_full_precision(tensor)`         | N/A                                |
 | `tensor.int()`                               | Similar to `tensor.to(torch.long)` |
@@ -264,6 +266,7 @@ Those operations are only available for `Float` tensors.
 | `tensor.random(shape, distribution, device)` | N/A                                |
 | `tensor.random_like(distribution)`           | `torch.rand_like()` only uniform   |
 | `tensor.recip()`                             | `tensor.reciprocal()`              |
+| `tensor.round()`                             | `tensor.round()`                   |
 | `tensor.sin()`                               | `tensor.sin()`                     |
 | `tensor.sqrt()`                              | `tensor.sqrt()`                    |
 | `tensor.swap_dims(dim1, dim2)`               | `tensor.transpose(dim1, dim2)`     |
@@ -330,6 +333,7 @@ strategies.
 | `activation::sigmoid(tensor)`                    | `nn.functional.sigmoid(tensor)`                    |
 | `activation::silu(tensor)`                       | `nn.functional.silu(tensor)`                       |
 | `activation::softmax(tensor, dim)`               | `nn.functional.softmax(tensor, dim)`               |
+| `activation::softmin(tensor, dim)`               | `nn.functional.softmin(tensor, dim)`               |
 | `activation::softplus(tensor, beta)`             | `nn.functional.softplus(tensor, beta)`             |
 | `activation::tanh(tensor)`                       | `nn.functional.tanh(tensor)`                       |
 

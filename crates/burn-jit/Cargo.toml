@@ -8,6 +8,7 @@ license.workspace = true
 name = "burn-jit"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/burn/tree/main/crates/burn-jit"
+documentation = "https://docs.rs/burn-jit"
 version.workspace = true
 
 [features]
@@ -30,7 +31,7 @@ template = []
 burn-common = { path = "../burn-common", version = "0.15.0" }
 burn-fusion = { path = "../burn-fusion", version = "0.15.0", optional = true }
 burn-tensor = { path = "../burn-tensor", version = "0.15.0", features = [
-  "cubecl",
+  "cubecl", "repr",
 ] }
 cubecl = { workspace = true, features = ["linalg"] }
 
@@ -41,6 +42,9 @@ log = { workspace = true }
 num-traits = { workspace = true }
 rand = { workspace = true }
 spin = { workspace = true }
+
+# Async
+futures-lite = { workspace = true, features = ["std"] }
 
 # Template
 serde = { workspace = true }
@@ -56,3 +60,4 @@ serial_test = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
 features = ["doc"]
+rustdoc-args = ["--cfg", "docsrs"]

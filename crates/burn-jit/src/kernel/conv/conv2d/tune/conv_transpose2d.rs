@@ -2,40 +2,18 @@ use burn_tensor::{ops::ConvTransposeOptions, ElementConversion, Shape};
 use cubecl::{
     tune,
     tune::{local_tuner, tune_with, LocalTuner},
-    AutotuneKey,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
     kernel::{
-        conv::{conv_transpose2d_col2im, conv_transpose2d_direct},
+        conv::{batches_per_run, conv_transpose2d_col2im, conv_transpose2d_direct},
         prng::random_uniform,
     },
     tensor::JitTensor,
     FloatElement, IntElement, JitAutotuneKey, JitRuntime, JitTuneId,
 };
 
-#[derive(Hash, Eq, PartialEq, Debug, Clone, Serialize, Deserialize, AutotuneKey)]
-/// Autotune key representative of matmul versions
-pub struct ConvTranspose2dAutotuneKey {
-    pub kernel_size: [usize; 2],
-    pub stride: [usize; 2],
-    pub padding: [usize; 2],
-    pub padding_out: [usize; 2],
-    pub dilation: [usize; 2],
-    pub groups: usize,
-    #[autotune(anchor)]
-    pub in_channels: usize,
-    #[autotune(anchor)]
-    pub out_channels: usize,
-    #[autotune(anchor)]
-    pub height: usize,
-    #[autotune(anchor)]
-    pub width: usize,
-    #[autotune(anchor)]
-    pub batch_size: usize,
-    pub has_bias: bool,
-}
+use super::ConvTranspose2dAutotuneKey;
 
 /// Executes autotune on conv2d operations
 pub fn conv_transpose2d_autotune<R: JitRuntime, E: FloatElement, I: IntElement>(
@@ -57,7 +35,7 @@ pub fn conv_transpose2d_autotune<R: JitRuntime, E: FloatElement, I: IntElement>(
     )
 }
 
-#[tune(operations(conv_transpose2d_direct, conv_transpose2d_col2im), create_key = create_key)]
+#[tune(operations(conv_transpose2d_direct, conv_transpose2d_col2im), create_key = create_key, should_run = should_run)]
 pub fn conv_transpose2d_operations<R: JitRuntime, E: FloatElement, I: IntElement>(
     key: JitAutotuneKey,
     input: JitTensor<R, E>,
@@ -114,4 +92,21 @@ fn create_key<R: JitRuntime, E: FloatElement>(
         batch_size,
         bias.is_some(),
     ))
+}
+
+fn should_run<R: JitRuntime, F: FloatElement, I: IntElement>(
+    _op: &ConvTranspose2dOperations<R, F, I>,
+    key: &JitAutotuneKey,
+    index: usize,
+) -> bool {
+    let key = match key {
+        JitAutotuneKey::ConvTranspose2d(key) => key,
+        _ => unreachable!(),
+    };
+
+    match index {
+        // im2col
+        1 => batches_per_run(key.batch_size, key.height, key.width).is_some(),
+        _ => true,
+    }
 }

@@ -30,6 +30,7 @@ include_models!(
     conv1d,
     conv2d,
     conv3d,
+    conv_transpose1d,
     conv_transpose2d,
     conv_transpose3d,
     cos,
@@ -116,6 +117,8 @@ include_models!(
     sum_int,
     tanh,
     tile,
+    trilu_upper,
+    trilu_lower,
     transpose,
     unsqueeze,
     unsqueeze_opset11,
@@ -1507,6 +1510,28 @@ mod tests {
     }
 
     #[test]
+    fn conv_transpose1d() {
+        // Initialize the model with weights (loaded from the exported file)
+        let model: conv_transpose1d::Model<Backend> = conv_transpose1d::Model::default();
+
+        // Run the model with ones as input for easier testing
+        let input = Tensor::<Backend, 3>::ones([2, 4, 10], &Default::default());
+
+        let output = model.forward(input);
+
+        let expected_shape = Shape::from([2, 6, 22]);
+        assert_eq!(output.shape(), expected_shape);
+
+        // We are using the sum of the output tensor to test the correctness of the conv_transpose1d node
+        // because the output tensor is too large to compare with the expected tensor.
+        let output_sum = output.sum().into_scalar();
+
+        let expected_sum = 33.810329; // example result running the corresponding PyTorch model (conv_transpose1d.py)
+
+        assert!(expected_sum.approx_eq(output_sum, (1.0e-4, 2)));
+    }
+
+    #[test]
     fn conv_transpose2d() {
         // Initialize the model with weights (loaded from the exported file)
         let model: conv_transpose2d::Model<Backend> = conv_transpose2d::Model::default();
@@ -1867,6 +1892,44 @@ mod tests {
             [1.0f32, 2.0f32, 1.0f32, 2.0f32],
             [3.0f32, 4.0f32, 3.0f32, 4.0f32],
         ]);
+
+        output.assert_eq(&expected, true);
+    }
+
+    #[test]
+    fn trilu_upper() {
+        let device = Default::default();
+        let model: trilu_upper::Model<Backend> = trilu_upper::Model::new(&device);
+        let input = Tensor::<Backend, 3>::from_floats(
+            [[[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]]],
+            &device,
+        );
+        let expected = TensorData::from([[
+            [1.0_f32, 2.0_f32, 3.0_f32],
+            [0.0_f32, 5.0_f32, 6.0_f32],
+            [0.0_f32, 0.0_f32, 9.0_f32],
+        ]]);
+
+        let output = model.forward(input).to_data();
+
+        output.assert_eq(&expected, true);
+    }
+
+    #[test]
+    fn trilu_lower() {
+        let device = Default::default();
+        let model: trilu_lower::Model<Backend> = trilu_lower::Model::new(&device);
+        let input = Tensor::<Backend, 3>::from_floats(
+            [[[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]]],
+            &device,
+        );
+        let expected = TensorData::from([[
+            [1.0_f32, 0.0_f32, 0.0_f32],
+            [4.0_f32, 5.0_f32, 0.0_f32],
+            [7.0_f32, 8.0_f32, 9.0_f32],
+        ]]);
+
+        let output = model.forward(input).to_data();
 
         output.assert_eq(&expected, true);
     }
