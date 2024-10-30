@@ -73,6 +73,7 @@ mod cube_wgpu {
                 WgpuDevice::Existing(id) => {
                     DeviceId::new(5, (id.inner() % (u32::MAX as u64)) as u32)
                 }
+                WgpuDevice::DefaultDevice => DeviceId::new(6, 0),
             }
         }
     }
@@ -84,6 +85,19 @@ mod cube_cuda {
     use cubecl::cuda::CudaDevice;
 
     impl DeviceOps for CudaDevice {
+        fn id(&self) -> DeviceId {
+            DeviceId::new(0, self.index as u32)
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[cfg(feature = "cubecl-hip")]
+mod cube_hip {
+    use crate::backend::{DeviceId, DeviceOps};
+    use cubecl::hip::HipDevice;
+
+    impl DeviceOps for HipDevice {
         fn id(&self) -> DeviceId {
             DeviceId::new(0, self.index as u32)
         }
