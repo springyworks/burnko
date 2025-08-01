@@ -1,5 +1,9 @@
 use super::cat::cat_with_slice_assign;
 use super::repeat_dim::repeat_with_slice_assign;
+use super::scan::{
+    cumsum_with_slice_assign, cummax_with_slice_assign, cummin_with_slice_assign,
+    cumprod_with_slice_assign, scan_with_slice_assign, ScanConfig,
+};
 use super::{BoolTensor, Device, FloatElem, FloatTensor, IntElem, IntTensor};
 use crate::{Distribution, ElementConversion, Float, TensorData, backend::Backend, tensor::Shape};
 use crate::{FloatDType, TensorMetadata, TensorPrimitive};
@@ -761,6 +765,76 @@ pub trait FloatTensorOps<B: Backend> {
     ///
     /// A tensor with the mean of all elements in `tensor` along `dim`.
     fn float_mean_dim(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B>;
+
+    /// Performs a parallel associative scan along the specified dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The input tensor.
+    /// * `config` - The scan configuration specifying operation, dimension, etc.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the same shape as `tensor` containing the scan results.
+    fn float_scan(tensor: FloatTensor<B>, config: ScanConfig) -> FloatTensor<B> {
+        scan_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), config).tensor()
+    }
+
+    /// Computes the cumulative sum along the specified dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The input tensor.
+    /// * `dim` - The dimension along which to compute cumulative sum.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the same shape as `tensor` containing cumulative sums.
+    fn float_cumsum(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
+        cumsum_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
+    }
+
+    /// Computes the cumulative product along the specified dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The input tensor.
+    /// * `dim` - The dimension along which to compute cumulative product.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the same shape as `tensor` containing cumulative products.
+    fn float_cumprod(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
+        cumprod_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
+    }
+
+    /// Computes the cumulative maximum along the specified dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The input tensor.
+    /// * `dim` - The dimension along which to compute cumulative maximum.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the same shape as `tensor` containing cumulative maximums.
+    fn float_cummax(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
+        cummax_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
+    }
+
+    /// Computes the cumulative minimum along the specified dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The input tensor.
+    /// * `dim` - The dimension along which to compute cumulative minimum.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the same shape as `tensor` containing cumulative minimums.
+    fn float_cummin(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
+        cummin_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
+    }
 
     /// Converts a tensor to another floating point data type.
     ///

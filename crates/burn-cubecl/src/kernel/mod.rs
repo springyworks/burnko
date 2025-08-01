@@ -36,6 +36,8 @@ pub mod prng;
 pub mod quantization;
 /// Reduction algorithms
 pub mod reduce;
+/// Parallel scan operations
+pub mod scan;
 
 pub(crate) use clamp::*;
 pub(crate) use comparison::*;

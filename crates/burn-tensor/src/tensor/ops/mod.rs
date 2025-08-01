@@ -3,7 +3,7 @@ mod alias;
 mod binary;
 mod bool_tensor;
 mod int_tensor;
-mod modules;
+pub(crate) mod modules;
 mod qtensor;
 mod tensor;
 mod transaction;

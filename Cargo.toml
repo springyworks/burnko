@@ -16,7 +16,6 @@ members = [
 
 exclude = [
     "examples/notebook",
-    "examples/raspberry-pi-pico", # will cause xtask issues otherwise
 ]
 
 [workspace.package]

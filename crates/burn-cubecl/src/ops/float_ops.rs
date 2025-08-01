@@ -451,6 +451,62 @@ where
         )
     }
 
+    fn float_scan(tensor: FloatTensor<Self>, config: burn_tensor::ops::ScanConfig) -> FloatTensor<Self> {
+        use crate::kernel::scan::gpu_scan;
+        
+        execute_with_dtype!(
+            float(tensor.dtype),
+            E,
+            {
+                gpu_scan::<R, E>(tensor, config)
+            }
+        )
+    }
+
+    fn float_cumsum(tensor: FloatTensor<Self>, dim: usize) -> FloatTensor<Self> {
+        use crate::kernel::scan::gpu_scan;
+        use burn_tensor::ops::{ScanConfig, ScanOp};
+        
+        execute_with_dtype!(
+            float(tensor.dtype),
+            E,
+            gpu_scan::<R, E>(tensor, ScanConfig::new(ScanOp::Add, dim))
+        )
+    }
+
+    fn float_cumprod(tensor: FloatTensor<Self>, dim: usize) -> FloatTensor<Self> {
+        use crate::kernel::scan::gpu_scan;
+        use burn_tensor::ops::{ScanConfig, ScanOp};
+        
+        execute_with_dtype!(
+            float(tensor.dtype),
+            E,
+            gpu_scan::<R, E>(tensor, ScanConfig::new(ScanOp::Mul, dim))
+        )
+    }
+
+    fn float_cummax(tensor: FloatTensor<Self>, dim: usize) -> FloatTensor<Self> {
+        use crate::kernel::scan::gpu_scan;
+        use burn_tensor::ops::{ScanConfig, ScanOp};
+        
+        execute_with_dtype!(
+            float(tensor.dtype),
+            E,
+            gpu_scan::<R, E>(tensor, ScanConfig::new(ScanOp::Max, dim))
+        )
+    }
+
+    fn float_cummin(tensor: FloatTensor<Self>, dim: usize) -> FloatTensor<Self> {
+        use crate::kernel::scan::gpu_scan;
+        use burn_tensor::ops::{ScanConfig, ScanOp};
+        
+        execute_with_dtype!(
+            float(tensor.dtype),
+            E,
+            gpu_scan::<R, E>(tensor, ScanConfig::new(ScanOp::Min, dim))
+        )
+    }
+
     fn float_prod(tensor: FloatTensor<Self>) -> FloatTensor<Self> {
         execute_with_dtype!(
             float(tensor.dtype),

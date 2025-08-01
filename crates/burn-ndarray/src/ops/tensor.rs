@@ -9,11 +9,13 @@ use super::{NdArrayMathOps, NdArrayOps, matmul::matmul};
 use crate::element::{ExpElement, FloatNdArrayElement, IntNdArrayElement, QuantElement};
 use crate::{NdArray, tensor::NdArrayTensor};
 use crate::{NdArrayDevice, NdArrayTensorFloat, SEED, execute_with_float_dtype};
+use crate::ops::macros::{cumsum_dim, cumprod_dim, cummax_dim, cummin_dim};
 
 // Workspace crates
 use burn_common::rand::get_seeded_rng;
 use burn_tensor::{DType, Distribution, FloatDType};
 use burn_tensor::{ElementConversion, Shape, TensorData, backend::Backend, ops::FloatTensorOps};
+use burn_tensor::ops::{ScanConfig, ScanOp};
 
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
@@ -563,5 +565,47 @@ impl<E: FloatNdArrayElement, I: IntNdArrayElement, Q: QuantElement> FloatTensorO
             }
             _ => panic!("Invalid cast types"),
         }
+    }
+
+    fn float_scan(
+        tensor: FloatTensor<Self>,
+        config: ScanConfig,
+    ) -> FloatTensor<Self> {
+        // Implement scan based on the configuration
+        match config.operation {
+            ScanOp::Add => Self::float_cumsum(tensor, config.dim),
+            ScanOp::Mul => Self::float_cumprod(tensor, config.dim),
+            ScanOp::Max => Self::float_cummax(tensor, config.dim),
+            ScanOp::Min => Self::float_cummin(tensor, config.dim),
+            _ => panic!("Unsupported scan operation: {:?}", config.operation),
+        }
+    }
+
+    fn float_cumsum(
+        tensor: FloatTensor<Self>,
+        dim: usize,
+    ) -> FloatTensor<Self> {
+        execute_with_float_dtype!(tensor, |tensor| cumsum_dim(tensor, dim))
+    }
+
+    fn float_cumprod(
+        tensor: FloatTensor<Self>,
+        dim: usize,
+    ) -> FloatTensor<Self> {
+        execute_with_float_dtype!(tensor, |tensor| cumprod_dim(tensor, dim))
+    }
+
+    fn float_cummax(
+        tensor: FloatTensor<Self>,
+        dim: usize,
+    ) -> FloatTensor<Self> {
+        execute_with_float_dtype!(tensor, |tensor| cummax_dim(tensor, dim))
+    }
+
+    fn float_cummin(
+        tensor: FloatTensor<Self>,
+        dim: usize,
+    ) -> FloatTensor<Self> {
+        execute_with_float_dtype!(tensor, |tensor| cummin_dim(tensor, dim))
     }
 }

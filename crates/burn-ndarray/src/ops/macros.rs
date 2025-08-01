@@ -34,6 +34,7 @@ macro_rules! keepdim {
 use burn_tensor::ElementConversion;
 pub(crate) use keepdim;
 use ndarray::Axis;
+use core::cmp::PartialOrd;
 
 use crate::{element::NdArrayElement, tensor::NdArrayTensor};
 
@@ -62,4 +63,56 @@ pub(crate) fn prod_dim<E: NdArrayElement>(
         .into_shared();
 
     NdArrayTensor { array }
+}
+
+/// Cumulative sum along axis using ndarray's accumulate_axis_inplace
+pub(crate) fn cumsum_dim<E: NdArrayElement>(
+    tensor: NdArrayTensor<E>,
+    dim: usize,
+) -> NdArrayTensor<E> {
+    let axis = Axis(dim);
+    let mut array = tensor.array.into_owned();
+    array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
+    NdArrayTensor::new(array.into_shared())
+}
+
+/// Cumulative product along axis using ndarray's accumulate_axis_inplace
+pub(crate) fn cumprod_dim<E: NdArrayElement>(
+    tensor: NdArrayTensor<E>,
+    dim: usize,
+) -> NdArrayTensor<E> {
+    let axis = Axis(dim);
+    let mut array = tensor.array.into_owned();
+    array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr * prev);
+    NdArrayTensor::new(array.into_shared())
+}
+
+/// Cumulative maximum along axis using ndarray's accumulate_axis_inplace
+pub(crate) fn cummax_dim<E: NdArrayElement + PartialOrd>(
+    tensor: NdArrayTensor<E>,
+    dim: usize,
+) -> NdArrayTensor<E> {
+    let axis = Axis(dim);
+    let mut array = tensor.array.into_owned();
+    array.accumulate_axis_inplace(axis, |&prev, curr| {
+        if prev > *curr {
+            *curr = prev;
+        }
+    });
+    NdArrayTensor::new(array.into_shared())
+}
+
+/// Cumulative minimum along axis using ndarray's accumulate_axis_inplace
+pub(crate) fn cummin_dim<E: NdArrayElement + PartialOrd>(
+    tensor: NdArrayTensor<E>,
+    dim: usize,
+) -> NdArrayTensor<E> {
+    let axis = Axis(dim);
+    let mut array = tensor.array.into_owned();
+    array.accumulate_axis_inplace(axis, |&prev, curr| {
+        if prev < *curr {
+            *curr = prev;
+        }
+    });
+    NdArrayTensor::new(array.into_shared())
 }

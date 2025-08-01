@@ -2116,6 +2116,38 @@ where
     }
 }
 
+impl<const D: usize, B: Backend> Tensor<B, D, Float> {
+    /// Computes the cumulative sum along the specified dimension.
+    pub fn cumsum(self, dim: usize) -> Self {
+        check!(TensorCheck::aggregate_dim::<D>("Cumsum", dim));
+        Self::new(TensorPrimitive::Float(B::float_cumsum(self.primitive.tensor(), dim)))
+    }
+
+    /// Computes the cumulative product along the specified dimension.
+    pub fn cumprod(self, dim: usize) -> Self {
+        check!(TensorCheck::aggregate_dim::<D>("Cumprod", dim));
+        Self::new(TensorPrimitive::Float(B::float_cumprod(self.primitive.tensor(), dim)))
+    }
+
+    /// Computes the cumulative maximum along the specified dimension.
+    pub fn cummax(self, dim: usize) -> Self {
+        check!(TensorCheck::aggregate_dim::<D>("Cummax", dim));
+        Self::new(TensorPrimitive::Float(B::float_cummax(self.primitive.tensor(), dim)))
+    }
+
+    /// Computes the cumulative minimum along the specified dimension.
+    pub fn cummin(self, dim: usize) -> Self {
+        check!(TensorCheck::aggregate_dim::<D>("Cummin", dim));
+        Self::new(TensorPrimitive::Float(B::float_cummin(self.primitive.tensor(), dim)))
+    }
+
+    /// Performs a parallel associative scan along the specified dimension.
+    pub fn scan(self, config: crate::ops::scan::ScanConfig) -> Self {
+        check!(TensorCheck::aggregate_dim::<D>("Scan", config.dim));
+        Self::new(TensorPrimitive::Float(B::float_scan(self.primitive.tensor(), config)))
+    }
+}
+
 impl<B, K> Tensor<B, 2, K>
 where
     B: Backend,
