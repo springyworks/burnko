@@ -784,42 +784,41 @@ pub trait FloatTensorOps<B: Backend> {
     ///
     /// # Arguments
     ///
-    /// * `tensor` - The input tensor.
+    /// * `tensor` - The tensor.
     /// * `dim` - The dimension along which to compute cumulative sum.
     ///
     /// # Returns
     ///
     /// A tensor with the same shape as `tensor` containing cumulative sums.
     fn float_cumsum(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
-        cumsum_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
-    }
-
-    /// Computes the cumulative product along the specified dimension.
+        // Use the backend's scan implementation directly instead of slice assignment fallback
+        B::float_scan(tensor, ScanConfig::cumsum(dim, false))
+    }    /// Computes the cumulative product along the specified dimension.
     ///
     /// # Arguments
     ///
-    /// * `tensor` - The input tensor.
+    /// * `tensor` - The tensor.
     /// * `dim` - The dimension along which to compute cumulative product.
     ///
     /// # Returns
     ///
     /// A tensor with the same shape as `tensor` containing cumulative products.
     fn float_cumprod(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
-        cumprod_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
+        B::float_scan(tensor, ScanConfig::cumprod(dim, false))
     }
 
     /// Computes the cumulative maximum along the specified dimension.
     ///
     /// # Arguments
     ///
-    /// * `tensor` - The input tensor.
+    /// * `tensor` - The tensor.
     /// * `dim` - The dimension along which to compute cumulative maximum.
     ///
     /// # Returns
     ///
     /// A tensor with the same shape as `tensor` containing cumulative maximums.
     fn float_cummax(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
-        cummax_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
+        B::float_scan(tensor, ScanConfig::cummax(dim, false))
     }
 
     /// Computes the cumulative minimum along the specified dimension.
@@ -833,7 +832,7 @@ pub trait FloatTensorOps<B: Backend> {
     ///
     /// A tensor with the same shape as `tensor` containing cumulative minimums.
     fn float_cummin(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
-        cummin_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
+        B::float_scan(tensor, ScanConfig::cummin(dim, false))
     }
 
     /// Converts a tensor to another floating point data type.

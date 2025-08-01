@@ -2264,4 +2264,19 @@ impl<B: FusionBackend> FloatTensorOps<Self> for Fusion<B> {
 
         out
     }
+
+    /// Scan operation - forward to backend implementation since fusion doesn't optimize scan yet
+    fn float_scan(tensor: FloatTensor<Self>, config: burn_tensor::ops::ScanConfig) -> FloatTensor<Self> {
+        // For scan operations, we bypass fusion by converting to data and back
+        // This ensures our GPU implementation is called correctly
+        use burn_common::future;
+        let device = tensor.client.device().clone();
+        let data = future::block_on(tensor.into_data::<B>());
+        let tensor_unwrapped = B::float_from_data(data, &device);
+        let result = B::float_scan(tensor_unwrapped, config);
+        
+        // Convert result back to fusion tensor
+        let result_data = future::block_on(B::float_into_data(result));
+        Self::float_from_data(result_data, &device)
+    }
 }

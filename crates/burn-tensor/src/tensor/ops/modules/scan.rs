@@ -20,12 +20,12 @@ pub enum ScanOp {
 }
 
 /// Configuration for scan operations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScanConfig {
     /// The scan operation to perform
-    pub operation: ScanOp,
-    /// Whether to perform inclusive (default) or exclusive scan
-    pub exclusive: bool,
+    pub op: ScanOp,
+    /// Whether to perform inclusive (true) or exclusive (false) scan
+    pub inclusive: bool,
     /// The dimension along which to perform the scan
     pub dim: usize,
 }
@@ -33,8 +33,8 @@ pub struct ScanConfig {
 impl Default for ScanConfig {
     fn default() -> Self {
         Self {
-            operation: ScanOp::Add,
-            exclusive: false,
+            op: ScanOp::Add,
+            inclusive: true,
             dim: 0,
         }
     }
@@ -42,19 +42,31 @@ impl Default for ScanConfig {
 
 impl ScanConfig {
     /// Create a new scan configuration
-    pub fn new(operation: ScanOp, dim: usize) -> Self {
+    pub fn new(op: ScanOp, dim: usize) -> Self {
         Self {
-            operation,
-            exclusive: false,
+            op,
+            inclusive: true,
             dim,
         }
+    }
+
+    /// Set whether to perform inclusive scan
+    pub fn inclusive(mut self, inclusive: bool) -> Self {
+        self.inclusive = inclusive;
+        self
+    }
+
+    /// Set whether to perform exclusive scan 
+    pub fn exclusive(mut self, exclusive: bool) -> Self {
+        self.inclusive = !exclusive;
+        self
     }
 
     /// Create a new cumulative sum configuration
     pub fn cumsum(dim: usize, exclusive: bool) -> Self {
         Self {
-            operation: ScanOp::Add,
-            exclusive,
+            op: ScanOp::Add,
+            inclusive: !exclusive,
             dim,
         }
     }
@@ -62,8 +74,8 @@ impl ScanConfig {
     /// Create a new cumulative product configuration
     pub fn cumprod(dim: usize, exclusive: bool) -> Self {
         Self {
-            operation: ScanOp::Mul,
-            exclusive,
+            op: ScanOp::Mul,
+            inclusive: !exclusive,
             dim,
         }
     }
@@ -71,8 +83,8 @@ impl ScanConfig {
     /// Create a new cumulative max configuration
     pub fn cummax(dim: usize, exclusive: bool) -> Self {
         Self {
-            operation: ScanOp::Max,
-            exclusive,
+            op: ScanOp::Max,
+            inclusive: !exclusive,
             dim,
         }
     }
@@ -80,8 +92,8 @@ impl ScanConfig {
     /// Create a new cumulative min configuration
     pub fn cummin(dim: usize, exclusive: bool) -> Self {
         Self {
-            operation: ScanOp::Min,
-            exclusive,
+            op: ScanOp::Min,
+            inclusive: !exclusive,
             dim,
         }
     }

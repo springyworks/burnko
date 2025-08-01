@@ -5,71 +5,50 @@ use cubecl::{calculate_cube_count_elemwise, prelude::*};
 /// Serial scan kernel - simplified approach for initial implementation
 /// Each thread processes the entire scan dimension for one "scan line"
 #[cube(launch_unchecked)]
-fn scan_serial_kernel<F: Float>(
-    input: &Tensor<F>,
-    output: &mut Tensor<F>,
-    #[comptime] scan_dim: u32,
+pub fn scan_serial_kernel<F: Float>(
+    input: &Array<F>,
+    output: &mut Array<F>,
+    #[comptime] _scan_dim: u32,
     #[comptime] operation: ScanOp,
-    #[comptime] rank: u32,
+    #[comptime] _rank: u32,
 ) {
-    // Get thread ID - each thread handles one scan line
-    let thread_id = ABSOLUTE_POS;
+    let thread_id = UNIT_POS_X;
     
-    // Calculate dimensions
-    let scan_dim_size = input.shape(scan_dim);
-    let scan_stride = input.stride(scan_dim);
-    
-    // Total number of elements in tensor
-    let total_elements = input.len();
-    
-    // Number of scan lines (how many independent scans to perform)
-    let num_scan_lines = total_elements / scan_dim_size;
-    
-    if thread_id >= num_scan_lines {
-        terminate!();
-    }
-    
-    // Calculate the starting offset for this thread's scan line
-    // This is a simplified approach: enumerate all positions that don't change along scan_dim
-    let mut base_offset = 0;
-    let mut remaining_index = thread_id;
-    
-    // Build the offset by going through each dimension except scan_dim
-    for dim in 0..rank {
-        if dim != scan_dim {
-            let stride = input.stride(dim);
-            let shape = input.shape(dim);
+    // Only thread 0 performs the computation for serial scan
+    if thread_id == 0 {
+        let total_elements = Array::len(input);
+        
+        // Simple 1D scan implementation
+        if total_elements > 0 {
+            // Initialize first element
+            output[0] = input[0];
             
-            let coord = remaining_index % shape;
-            remaining_index = remaining_index / shape;
-            base_offset += coord * stride;
+            // Perform scan operation
+            for i in 1..total_elements {
+                match operation {
+                    ScanOp::Add => {
+                        output[i] = output[i - 1] + input[i];
+                    }
+                    ScanOp::Mul => {
+                        output[i] = output[i - 1] * input[i];
+                    }
+                    ScanOp::Max => {
+                        let prev_val = output[i - 1];
+                        let curr_val = input[i];
+                        output[i] = F::max(prev_val, curr_val);
+                    }
+                    ScanOp::Min => {
+                        let prev_val = output[i - 1];
+                        let curr_val = input[i];
+                        output[i] = F::min(prev_val, curr_val);
+                    }
+                    ScanOp::And | ScanOp::Or | ScanOp::Xor => {
+                        // Logical operations not supported for float tensors
+                        output[i] = input[i];
+                    }
+                }
+            }
         }
-    }
-    
-    // Now perform the scan along the scan dimension
-    // Initialize the first element
-    let first_offset = base_offset;
-    output[first_offset] = input[first_offset];
-    
-    // Scan the remaining elements
-    for i in 1..scan_dim_size {
-        let current_offset = base_offset + i * scan_stride;
-        let prev_offset = base_offset + (i - 1) * scan_stride;
-        
-        let current_val = input[current_offset];
-        let prev_result = output[prev_offset];
-        
-        // Apply the scan operation
-        let result = match comptime![operation] {
-            ScanOp::Add => prev_result + current_val,
-            ScanOp::Mul => prev_result * current_val,
-            ScanOp::Max => F::max(prev_result, current_val),
-            ScanOp::Min => F::min(prev_result, current_val),
-            // For unsupported operations, default to Add
-            _ => prev_result + current_val,
-        };
-        
-        output[current_offset] = result;
     }
 }
 
@@ -95,15 +74,17 @@ pub fn gpu_scan_serial<R: CubeRuntime, E: CubeElement>(
     
     // Set up kernel launch parameters
     let cube_dim = CubeDim::default();
-    let cube_count = calculate_cube_count_elemwise(num_scan_lines, cube_dim);
+    
+    // For our serial implementation, we only need 1 thread
+    let cube_count = CubeCount::Static(1, 1, 1);
     
     // Launch kernel based on element type
     // Note: We need to handle the type constraints properly
     match E::dtype() {
         burn_tensor::DType::F32 => {
             // Cast tensor to f32 and launch kernel
-            let input_f32 = tensor.as_tensor_arg::<f32>(1);
-            let output_f32 = output.as_tensor_arg::<f32>(1);
+            let input_f32 = tensor.as_array_arg::<f32>(1);
+            let output_f32 = output.as_array_arg::<f32>(1);
             
             unsafe {
                 scan_serial_kernel::launch_unchecked::<f32, R>(
@@ -113,15 +94,15 @@ pub fn gpu_scan_serial<R: CubeRuntime, E: CubeElement>(
                     input_f32,
                     output_f32,
                     scan_dim as u32,
-                    config.operation,
+                    config.op,
                     rank as u32,
                 );
             }
         }
         burn_tensor::DType::F64 => {
             // Cast tensor to f64 and launch kernel
-            let input_f64 = tensor.as_tensor_arg::<f64>(1);
-            let output_f64 = output.as_tensor_arg::<f64>(1);
+            let input_f64 = tensor.as_array_arg::<f64>(1);
+            let output_f64 = output.as_array_arg::<f64>(1);
             
             unsafe {
                 scan_serial_kernel::launch_unchecked::<f64, R>(
@@ -131,7 +112,7 @@ pub fn gpu_scan_serial<R: CubeRuntime, E: CubeElement>(
                     input_f64,
                     output_f64,
                     scan_dim as u32,
-                    config.operation,
+                    config.op,
                     rank as u32,
                 );
             }

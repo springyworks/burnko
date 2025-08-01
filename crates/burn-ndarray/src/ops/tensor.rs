@@ -572,12 +572,12 @@ impl<E: FloatNdArrayElement, I: IntNdArrayElement, Q: QuantElement> FloatTensorO
         config: ScanConfig,
     ) -> FloatTensor<Self> {
         // Implement scan based on the configuration
-        match config.operation {
+        match config.op {
             ScanOp::Add => Self::float_cumsum(tensor, config.dim),
             ScanOp::Mul => Self::float_cumprod(tensor, config.dim),
             ScanOp::Max => Self::float_cummax(tensor, config.dim),
             ScanOp::Min => Self::float_cummin(tensor, config.dim),
-            _ => panic!("Unsupported scan operation: {:?}", config.operation),
+            _ => panic!("Unsupported scan operation: {:?}", config.op),
         }
     }
 
