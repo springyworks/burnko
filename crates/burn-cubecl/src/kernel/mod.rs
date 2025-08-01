@@ -39,6 +39,10 @@ pub mod reduce;
 /// Parallel scan operations
 pub mod scan;
 
+#[cfg(test)]
+/// Tests for scan operations
+pub mod scan_tests;
+
 pub(crate) use clamp::*;
 pub(crate) use comparison::*;
 pub use index::*;

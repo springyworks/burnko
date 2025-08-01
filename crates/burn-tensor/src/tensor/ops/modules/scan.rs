@@ -1,7 +1,7 @@
 
 
 /// Scan operation type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ScanOp {
     /// Addition scan (cumulative sum)
     Add,
