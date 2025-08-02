@@ -1,3 +1,9 @@
+use crate::ops::scan_parallel::{cumsum_dim_parallel, cumprod_dim_parallel};
+use crate::{element::NdArrayElement, tensor::NdArrayTensor};
+use burn_tensor::ElementConversion;
+use core::cmp::PartialOrd;
+use ndarray::Axis;
+
 macro_rules! keepdim {
     (
         $dim:expr,
@@ -31,12 +37,7 @@ macro_rules! keepdim {
     }};
 }
 
-use burn_tensor::ElementConversion;
 pub(crate) use keepdim;
-use ndarray::Axis;
-use core::cmp::PartialOrd;
-
-use crate::{element::NdArrayElement, tensor::NdArrayTensor};
 
 pub(crate) fn mean_dim<E: NdArrayElement>(
     tensor: NdArrayTensor<E>,
@@ -65,26 +66,46 @@ pub(crate) fn prod_dim<E: NdArrayElement>(
     NdArrayTensor { array }
 }
 
-/// Cumulative sum along axis using ndarray's accumulate_axis_inplace
+/// Cumulative sum along axis using parallel implementation when beneficial
 pub(crate) fn cumsum_dim<E: NdArrayElement>(
     tensor: NdArrayTensor<E>,
     dim: usize,
 ) -> NdArrayTensor<E> {
-    let axis = Axis(dim);
-    let mut array = tensor.array.into_owned();
-    array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
-    NdArrayTensor::new(array.into_shared())
+    #[cfg(feature = "std")]
+    {
+        // Use parallel implementation for better multi-core utilization
+        cumsum_dim_parallel(tensor, dim)
+    }
+    
+    #[cfg(not(feature = "std"))]
+    {
+        // Fallback to sequential implementation
+        let axis = Axis(dim);
+        let mut array = tensor.array.into_owned();
+        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
+        NdArrayTensor::new(array.into_shared())
+    }
 }
 
-/// Cumulative product along axis using ndarray's accumulate_axis_inplace
+/// Cumulative product along axis using parallel implementation when beneficial
 pub(crate) fn cumprod_dim<E: NdArrayElement>(
     tensor: NdArrayTensor<E>,
     dim: usize,
 ) -> NdArrayTensor<E> {
-    let axis = Axis(dim);
-    let mut array = tensor.array.into_owned();
-    array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr * prev);
-    NdArrayTensor::new(array.into_shared())
+    #[cfg(feature = "std")]
+    {
+        // Use parallel implementation for better multi-core utilization
+        cumprod_dim_parallel(tensor, dim)
+    }
+    
+    #[cfg(not(feature = "std"))]
+    {
+        // Fallback to sequential implementation  
+        let axis = Axis(dim);
+        let mut array = tensor.array.into_owned();
+        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr * prev);
+        NdArrayTensor::new(array.into_shared())
+    }
 }
 
 /// Cumulative maximum along axis using ndarray's accumulate_axis_inplace
