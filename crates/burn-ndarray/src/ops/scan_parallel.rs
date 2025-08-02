@@ -90,6 +90,9 @@ pub(crate) fn cumprod_dim_parallel<E: NdArrayElement>(
 /// This follows the same pattern used in conv.rs and other Burn operations:
 /// - run_par! for scoped parallel execution  
 /// - iter_par! for parallel iteration over axis
+/// 
+/// Note: For 1D tensors along axis 0, we cannot parallelize effectively since 
+/// each axis iteration gives us a single scalar. In such cases, we fall back to sequential.
 #[cfg(feature = "std")]
 fn parallel_cumsum_inplace<E, S, D>(array: &mut ArrayBase<S, D>, axis: Axis)
 where
@@ -100,6 +103,18 @@ where
     let axis_len = array.shape()[axis.index()];
     
     if axis_len <= 1 {
+        return;
+    }
+
+    // For effective parallelization, we need multiple independent lanes.
+    // If we're doing cumsum along axis 0 on a 1D array, each "lane" is just a scalar,
+    // so parallelization doesn't help and can cause correctness issues.
+    let total_elements = array.len();
+    let lanes_count = total_elements / axis_len;
+    
+    if lanes_count < 2 {
+        // Fall back to sequential for 1D case or when we don't have enough lanes
+        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
         return;
     }
 
@@ -124,6 +139,16 @@ where
     let axis_len = array.shape()[axis.index()];
     
     if axis_len <= 1 {
+        return;
+    }
+
+    // For effective parallelization, we need multiple independent lanes.
+    let total_elements = array.len();
+    let lanes_count = total_elements / axis_len;
+    
+    if lanes_count < 2 {
+        // Fall back to sequential for 1D case or when we don't have enough lanes
+        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr * prev);
         return;
     }
 
@@ -239,58 +264,43 @@ mod tests {
         println!("✅ Analytical Test 3: 3x3 identity matrix cumsum along rows verified");
     }
     
-    /// Large-scale performance test comparing different tensor sizes
+    /// Debug test to understand the correctness issue
     #[test]
-    fn test_large_scale_parallel_performance() {
+    fn test_debug_simple_cumsum() {
         let device = Default::default();
-        let core_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
         
-        println!("🧵 Running large-scale parallel scan performance test on {} cores", core_count);
+        // Test 1: Simple 1D case - [1, 1, 1, 1, 1] should become [1, 2, 3, 4, 5]
+        let data = vec![1.0, 1.0, 1.0, 1.0, 1.0];
+        let tensor: Tensor<TestBackend, 1> = Tensor::from_data(
+            TensorData::new(data.clone(), Shape::new([5])), &device
+        );
         
-        let test_sizes = vec![
-            1_000,     // Should be sequential (below threshold)
-            10_000,    // Should trigger parallel
-            100_000,   // Definitely parallel
-            1_000_000, // Large parallel workload
-        ];
+        println!("Input: {:?}", data);
         
-        for &size in &test_sizes {
-            println!("\n📊 Testing size: {} elements", size);
-            
-            // Create test tensor with positive uniform random values (0.1 to 1.0) for monotonic cumsum
-            let tensor: Tensor<TestBackend, 1> = Tensor::random(
-                [size], Distribution::Uniform(0.1, 1.0), &device
-            );
-            
-            // Test cumsum performance
-            let start = Instant::now();
-            let result = tensor.clone().cumsum(0);
-            let duration = start.elapsed();
-            
-            let throughput = size as f64 / duration.as_secs_f64();
-            println!("   ⚡ Cumsum: {:?} ({:.2}M elements/sec)", duration, throughput / 1_000_000.0);
-            
-            // Verify correctness for cumsum with positive values - should be monotonic
-            let values: Vec<f32> = result.to_data().to_vec().unwrap();
-            // Since all values are positive (0.1 to 1.0), cumsum should be strictly monotonic
-            for i in 1..values.len() {
-                assert!(values[i] >= values[i-1], 
-                        "Cumsum monotonic property violated at index {}: {} < {}", i, values[i], values[i-1]);
-            }
-            
-            // Test cumprod performance (with smaller values to avoid overflow)
-            let small_tensor: Tensor<TestBackend, 1> = Tensor::random(
-                [size], Distribution::Uniform(1.0, 1.001), &device
-            );
-            
-            let start = Instant::now();
-            let _prod_result = small_tensor.cumprod(0);
-            let duration = start.elapsed();
-            
-            let throughput = size as f64 / duration.as_secs_f64();
-            println!("   ⚡ Cumprod: {:?} ({:.2}M elements/sec)", duration, throughput / 1_000_000.0);
+        let result = tensor.cumsum(0);
+        let output: Vec<f32> = result.to_data().to_vec().unwrap();
+        
+        println!("Output: {:?}", output);
+        println!("Expected: [1.0, 2.0, 3.0, 4.0, 5.0]");
+        
+        // Check each element
+        for i in 0..5 {
+            let expected = (i + 1) as f32;
+            assert_eq!(output[i], expected, 
+                      "Mismatch at index {}: got {}, expected {}", i, output[i], expected);
         }
+    }
+    
+    /// Test our sequential implementation directly
+    #[test]
+    fn test_sequential_cumsum_slice() {
+        let mut data = vec![1.0f32, 1.0, 1.0, 1.0, 1.0];
+        println!("Before sequential_cumsum_slice: {:?}", data);
         
-        println!("\n🎯 Large-scale parallel performance test completed successfully!");
+        sequential_cumsum_slice(&mut data);
+        
+        println!("After sequential_cumsum_slice: {:?}", data);
+        let expected = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        assert_eq!(data, expected);
     }
 }

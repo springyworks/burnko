@@ -6,10 +6,9 @@
 //! - Large-scale stress testing for multi-core utilization
 //! - Analytical test cases with predictable outcomes
 
-use crate::{element::NdArrayElement, tensor::NdArrayTensor};
+use crate::{element::NdArrayElement, tensor::NdArrayTensor, NdArray};
 use burn_tensor::{Tensor, TensorData, Shape, Distribution};
 use std::time::Instant;
-use num_traits::{Zero, One};
 
 #[cfg(test)]
 mod tests {
@@ -118,7 +117,7 @@ mod tests {
         );
         
         // Cumsum along dimension 1 (rows)
-        let cumsum_rows = identity.cumsum(1);
+        let cumsum_rows = identity.clone().cumsum(1);
         let result_data: Vec<f32> = cumsum_rows.to_data().to_vec().unwrap();
         
         // Expected for cumsum along rows:
