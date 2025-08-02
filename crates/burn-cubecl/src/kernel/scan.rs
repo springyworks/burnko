@@ -136,90 +136,20 @@ pub fn gpu_scan_serial<R: CubeRuntime, E: CubeElement>(
     output
 }
 
-/// Main GPU scan function - uses parallel implementation for small scan dimensions
+/// Main GPU scan function - always uses GPU parallel implementation
+/// No automatic switching to CPU or serial implementations
 pub fn gpu_scan<R: CubeRuntime, E: CubeElement>(
     tensor: CubeTensor<R>,
     config: ScanConfig,
 ) -> CubeTensor<R> {
-    let scan_dim_size = tensor.shape.dims[config.dim];
-    
-    // Use parallel implementation for scan dimensions that fit in a single workgroup
-    if scan_dim_size <= 256 && matches!(E::dtype(), burn_tensor::DType::F32 | burn_tensor::DType::F64) {
-        gpu_scan_parallel::<R, E>(tensor, config)
-    } else {
-        // Fall back to serial implementation for larger scan dimensions
-        gpu_scan_serial::<R, E>(tensor, config)
-    }
+    // Always use GPU parallel implementation - no crossover switching
+    // This ensures consistent GPU execution within compute graphs
+    gpu_scan_parallel::<R, E>(tensor, config)
 }
 
-/// Parallel GPU scan implementation using workgroup-level parallelism
-/// Now properly handles multi-dimensional tensors with dimension-aware scanning
-pub fn gpu_scan_parallel<R: CubeRuntime, E: CubeElement>(
-    tensor: CubeTensor<R>,
-    config: ScanConfig,
-) -> CubeTensor<R> {
-    let output = empty_device::<R, E>(
-        tensor.client.clone(),
-        tensor.device.clone(),
-        tensor.shape.clone(),
-    );
-    
-    let scan_dim_size = tensor.shape.dims[config.dim];
-    
-    // Only use parallel scan if the scan dimension fits in workgroup size
-    if scan_dim_size <= 256 {
-        let total_elements = tensor.shape.num_elements();
-        let num_scan_lines = total_elements / scan_dim_size;
-        
-        // Each workgroup processes one scan line, with scan_dim_size threads per workgroup
-        let cube_dim = CubeDim::new(scan_dim_size.min(256) as u32, 1, 1);
-        let cube_count = CubeCount::Static(num_scan_lines as u32, 1, 1);
-        
-        match E::dtype() {
-            burn_tensor::DType::F32 => {
-                let input_f32 = tensor.as_tensor_arg::<f32>(1);
-                let output_f32 = output.as_tensor_arg::<f32>(1);
-                
-                unsafe {
-                    scan_parallel_dim_kernel::launch_unchecked::<f32, R>(
-                        &tensor.client,
-                        cube_count,
-                        cube_dim,
-                        input_f32,
-                        output_f32,
-                        config.dim as u32,
-                        config.op,
-                    );
-                }
-            }
-            burn_tensor::DType::F64 => {
-                let input_f64 = tensor.as_tensor_arg::<f64>(1);
-                let output_f64 = output.as_tensor_arg::<f64>(1);
-                
-                unsafe {
-                    scan_parallel_dim_kernel::launch_unchecked::<f64, R>(
-                        &tensor.client,
-                        cube_count,
-                        cube_dim,
-                        input_f64,
-                        output_f64,
-                        config.dim as u32,
-                        config.op,
-                    );
-                }
-            }
-            _ => panic!("Unsupported data type for parallel GPU scan: {:?}", E::dtype()),
-        }
-        
-        output
-    } else {
-        // Fall back to serial implementation for large scan dimensions
-        gpu_scan_serial::<R, E>(tensor, config)
-    }
-}
 
 /// Parallel scan kernel using workgroup-level parallelism for dimension-aware scanning
-/// Each workgroup processes one scan line along the specified dimension
+/// Enhanced to handle larger scan dimensions efficiently
 #[cube(launch_unchecked)]
 pub fn scan_parallel_dim_kernel<F: Float>(
     input: &Tensor<F>,
@@ -254,46 +184,145 @@ pub fn scan_parallel_dim_kernel<F: Float>(
     
     let stride = input.stride(scan_dim);
     
-    // Use shared memory for parallel scan within the scan line
-    let mut shared_data = SharedMemory::<F>::new(256);
+    let cube_size = CUBE_DIM_X;
     
-    // Load input data into shared memory
-    if thread_id < scan_dim_size {
-        let input_idx = base_offset + thread_id * stride;
-        shared_data[thread_id] = input[input_idx];
-    } else {
-        // Initialize out-of-bounds elements with identity values
-        shared_data[thread_id] = match operation {
-            ScanOp::Add => F::new(0.0),
-            ScanOp::Mul => F::new(1.0),
-            ScanOp::Max => F::new(-1000000.0), // Large negative value
-            ScanOp::Min => F::new(1000000.0),  // Large positive value
-            _ => F::new(0.0),
-        };
-    }
-    sync_cube();
-    
-    // Hillis-Steele parallel scan algorithm
-    let mut step = 1u32;
-    while step < 256 && step < scan_dim_size {
-        if thread_id >= step {
-            let left_val = shared_data[thread_id - step];
-            let current_val = shared_data[thread_id];
-            shared_data[thread_id] = match operation {
-                ScanOp::Add => left_val + current_val,
-                ScanOp::Mul => left_val * current_val,
-                ScanOp::Max => F::max(left_val, current_val),
-                ScanOp::Min => F::min(left_val, current_val),
-                _ => current_val,
-            };
+    // Handle arrays efficiently based on their size relative to cube size
+    if scan_dim_size <= cube_size {
+        // Small arrays: Use efficient Hillis-Steele parallel scan
+        if thread_id < scan_dim_size {
+            let element_idx = base_offset + thread_id * stride;
+            output[element_idx] = input[element_idx];
         }
+        
         sync_cube();
-        step *= 2;
-    }
-    
-    // Write results back to output
-    if thread_id < scan_dim_size {
-        let output_idx = base_offset + thread_id * stride;
-        output[output_idx] = shared_data[thread_id];
+        
+        // Hillis-Steele parallel prefix sum
+        let mut step = 1u32;
+        while step < scan_dim_size {
+            if thread_id >= step && thread_id < scan_dim_size {
+                let current_idx = base_offset + thread_id * stride;
+                let prev_idx = base_offset + (thread_id - step) * stride;
+                
+                let prev_val = output[prev_idx];
+                let curr_val = output[current_idx];
+                
+                let new_val = match operation {
+                    ScanOp::Add => prev_val + curr_val,
+                    ScanOp::Mul => prev_val * curr_val,
+                    ScanOp::Max => {
+                        if prev_val > curr_val { prev_val } else { curr_val }
+                    }
+                    ScanOp::Min => {
+                        if prev_val < curr_val { prev_val } else { curr_val }
+                    }
+                    _ => curr_val,
+                };
+                
+                output[current_idx] = new_val;
+            }
+            
+            step *= 2;
+            sync_cube();
+        }
+    } else {
+        // Large arrays: Use chunked processing with sequential fallback for correctness
+        // First copy input to output
+        let elements_per_thread = (scan_dim_size + cube_size - 1) / cube_size;
+        
+        for i in 0..elements_per_thread {
+            let global_idx = thread_id + i * cube_size;
+            if global_idx < scan_dim_size {
+                let element_idx = base_offset + global_idx * stride;
+                output[element_idx] = input[element_idx];
+            }
+        }
+        
+        sync_cube();
+        
+        // For large arrays, use a simpler approach: let thread 0 do sequential scan
+        // This ensures correctness while we work on a more advanced parallel chunked algorithm
+        if thread_id == 0 {
+            for i in 1..scan_dim_size {
+                let current_idx = base_offset + i * stride;
+                let prev_idx = base_offset + (i - 1) * stride;
+                
+                let prev_val = output[prev_idx];
+                let curr_val = output[current_idx];
+                
+                let new_val = match operation {
+                    ScanOp::Add => prev_val + curr_val,
+                    ScanOp::Mul => prev_val * curr_val,
+                    ScanOp::Max => {
+                        if prev_val > curr_val { prev_val } else { curr_val }
+                    }
+                    ScanOp::Min => {
+                        if prev_val < curr_val { prev_val } else { curr_val }
+                    }
+                    _ => curr_val,
+                };
+                
+                output[current_idx] = new_val;
+            }
+        }
     }
 }
+
+/// GPU scan operation dispatch  
+/// Always uses GPU parallel scan - no automatic switching
+pub fn gpu_scan_parallel<R: CubeRuntime, E: CubeElement>(
+    tensor: CubeTensor<R>,
+    config: ScanConfig,
+) -> CubeTensor<R> {
+    // Use the simplified parallel kernel
+    let output = empty_device::<R, E>(
+        tensor.client.clone(),
+        tensor.device.clone(),
+        tensor.shape.clone(),
+    );
+    
+    let scan_dim_size = tensor.shape.dims[config.dim];
+    let total_elements = tensor.shape.num_elements();
+    let num_scan_lines = total_elements / scan_dim_size;
+    
+    let cube_dim = CubeDim::new(256u32, 1, 1);
+    let cube_count = CubeCount::Static(num_scan_lines as u32, 1, 1);
+
+    match E::dtype() {
+        burn_tensor::DType::F32 => {
+            let input_f32 = tensor.as_tensor_arg::<f32>(1);
+            let output_f32 = output.as_tensor_arg::<f32>(1);
+            
+            unsafe {
+                scan_parallel_dim_kernel::launch_unchecked::<f32, R>(
+                    &tensor.client,
+                    cube_count,
+                    cube_dim,
+                    input_f32,
+                    output_f32,
+                    config.dim as u32,
+                    config.op,
+                );
+            }
+        }
+        burn_tensor::DType::F16 => {
+            let input_f16 = tensor.as_tensor_arg::<half::f16>(1);
+            let output_f16 = output.as_tensor_arg::<half::f16>(1);
+            
+            unsafe {
+                scan_parallel_dim_kernel::launch_unchecked::<half::f16, R>(
+                    &tensor.client,
+                    cube_count,
+                    cube_dim,
+                    input_f16,
+                    output_f16,
+                    config.dim as u32,
+                    config.op,
+                );
+            }
+        }
+        _ => panic!("Unsupported data type for GPU scan"),
+    }
+    
+    output
+}
+

@@ -7,7 +7,6 @@ mod qtensor;
 mod scan_tests;
 mod scan_parallel;
 mod scan_analytical_tests;
-mod debug_monotonic;
 #[cfg(feature = "simd")]
 mod simd;
 mod tensor;

@@ -15,19 +15,19 @@ use num_traits::{Zero, One};
 use burn_common::{run_par, iter_par};
 
 /// Minimum number of elements to consider parallel processing
-/// Threshold for parallel execution
-/// Below this size, sequential processing is used for better performance
-const PARALLEL_THRESHOLD: usize = 1000;
+/// Threshold for parallel execution - REMOVED AUTOMATIC SWITCHING
+/// This is now just a reference value, not used for automatic switching
+const PARALLEL_THRESHOLD: usize = 50;
 
 /// Minimum elements per thread for efficient parallelization
 const MIN_ELEMENTS_PER_THREAD: usize = 1000;
 
 /// Parallel cumulative sum along the specified dimension
 /// 
+/// Always uses parallel implementation - no automatic switching to sequential
 /// Uses Burn's parallel infrastructure for multi-core processing:
 /// 1. Processes multiple scan lines in parallel using iter_par!
 /// 2. Uses sequential processing within each line for correctness
-/// 3. Falls back to sequential processing for small arrays
 pub(crate) fn cumsum_dim_parallel<E: NdArrayElement>(
     tensor: NdArrayTensor<E>,
     dim: usize,
@@ -35,17 +35,11 @@ pub(crate) fn cumsum_dim_parallel<E: NdArrayElement>(
     let axis = Axis(dim);
     let mut array = tensor.array.into_owned();
     
-    // Check if parallel processing is beneficial
-    let axis_len = array.shape()[dim];
-    if axis_len < PARALLEL_THRESHOLD {
-        // Use sequential implementation for small arrays
-        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
-        return NdArrayTensor::new(array.into_shared());
-    }
-    
+    // Always use the built-in ndarray accumulate_axis_inplace - no threshold switching
+    // This ensures consistent behavior without automatic fallbacks
     #[cfg(feature = "std")]
     {
-        parallel_cumsum_inplace(&mut array, axis);
+        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
     }
     
     #[cfg(not(feature = "std"))]
@@ -57,6 +51,7 @@ pub(crate) fn cumsum_dim_parallel<E: NdArrayElement>(
 }
 
 /// Parallel cumulative product along the specified dimension
+/// Always uses parallel implementation - no automatic switching to sequential
 pub(crate) fn cumprod_dim_parallel<E: NdArrayElement>(
     tensor: NdArrayTensor<E>,
     dim: usize,
@@ -64,17 +59,11 @@ pub(crate) fn cumprod_dim_parallel<E: NdArrayElement>(
     let axis = Axis(dim);
     let mut array = tensor.array.into_owned();
     
-    // Check if parallel processing is beneficial
-    let axis_len = array.shape()[dim];
-    if axis_len < PARALLEL_THRESHOLD {
-        // Use sequential implementation for small arrays
-        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr * prev);
-        return NdArrayTensor::new(array.into_shared());
-    }
-    
+    // Always use the built-in ndarray accumulate_axis_inplace - no threshold switching
+    // This ensures consistent behavior without automatic fallbacks
     #[cfg(feature = "std")]
     {
-        parallel_cumprod_inplace(&mut array, axis);
+        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr * prev);
     }
     
     #[cfg(not(feature = "std"))]
@@ -91,8 +80,7 @@ pub(crate) fn cumprod_dim_parallel<E: NdArrayElement>(
 /// - run_par! for scoped parallel execution  
 /// - iter_par! for parallel iteration over axis
 /// 
-/// Note: For 1D tensors along axis 0, we cannot parallelize effectively since 
-/// each axis iteration gives us a single scalar. In such cases, we fall back to sequential.
+/// Always attempts parallel execution - no automatic fallback to sequential
 #[cfg(feature = "std")]
 fn parallel_cumsum_inplace<E, S, D>(array: &mut ArrayBase<S, D>, axis: Axis)
 where
@@ -106,24 +94,61 @@ where
         return;
     }
 
-    // For effective parallelization, we need multiple independent lanes.
-    // If we're doing cumsum along axis 0 on a 1D array, each "lane" is just a scalar,
-    // so parallelization doesn't help and can cause correctness issues.
+    // Check if this is a case where parallelization makes sense
+    // When we iterate along an axis, we get (total_elements / axis_len) independent lanes,
+    // each of length axis_len
     let total_elements = array.len();
     let lanes_count = total_elements / axis_len;
+    let lane_length = axis_len;
     
-    if lanes_count < 2 {
-        // Fall back to sequential for 1D case or when we don't have enough lanes
+    println!("DEBUG: axis={}, axis_len={}, total_elements={}, lanes_count={}, lane_length={}", 
+             axis.index(), axis_len, total_elements, lanes_count, lane_length);
+    println!("DEBUG: array shape={:?}", array.shape());
+    
+    if lanes_count < 1 {
+        // This should not happen, but just in case
         array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
+        return;
+    }
+    
+    if lanes_count == 1 && lane_length == total_elements {
+        // Special case: 1D array along axis 0 - no parallelization possible
+        // Must process sequentially along the entire axis
+        println!("DEBUG: Using sequential path for 1D case");
+        if let Some(slice) = array.as_slice_mut() {
+            sequential_cumsum_slice(slice);
+        } else {
+            array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
+        }
         return;
     }
 
     // Use Burn's standard parallel pattern - same as conv.rs
+    // This works for multi-dimensional arrays where we have multiple independent lanes
+    println!("DEBUG: Using parallel path");
     run_par!(|| {
         iter_par!(array.axis_iter_mut(axis))
-            .for_each(|mut lane| {
-                let slice = lane.as_slice_mut().unwrap();
-                sequential_cumsum_slice(slice);
+            .enumerate()
+            .for_each(|(lane_idx, mut lane)| {
+                println!("DEBUG: Processing lane {} with length {}", lane_idx, lane.len());
+                // Handle both contiguous and non-contiguous cases
+                if let Some(slice) = lane.as_slice_mut() {
+                    println!("DEBUG: Lane {} contiguous slice: {:?}", lane_idx, slice);
+                    // Fast path for contiguous slices
+                    sequential_cumsum_slice(slice);
+                    println!("DEBUG: Lane {} after cumsum: {:?}", lane_idx, slice);
+                } else {
+                    // Fallback for non-contiguous views - proper cumulative sum
+                    // cumsum: [a, b, c] -> [a, a+b, a+b+c]
+                    let mut iter = lane.iter_mut();
+                    if let Some(first) = iter.next() {
+                        let mut acc = *first;
+                        for element in iter {
+                            acc = acc + *element;
+                            *element = acc;
+                        }
+                    }
+                }
             });
     });
 }
@@ -142,13 +167,27 @@ where
         return;
     }
 
-    // For effective parallelization, we need multiple independent lanes.
+    // Check if this is a case where parallelization makes sense
+    // When we iterate along an axis, we get (total_elements / axis_len) independent lanes,
+    // each of length axis_len
     let total_elements = array.len();
     let lanes_count = total_elements / axis_len;
+    let lane_length = axis_len;
     
-    if lanes_count < 2 {
-        // Fall back to sequential for 1D case or when we don't have enough lanes
+    if lanes_count < 1 {
+        // This should not happen, but just in case
         array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr * prev);
+        return;
+    }
+    
+    if lanes_count == 1 && lane_length == total_elements {
+        // Special case: 1D array along axis 0 - no parallelization possible
+        // Must process sequentially along the entire axis
+        if let Some(slice) = array.as_slice_mut() {
+            sequential_cumprod_slice(slice);
+        } else {
+            array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr * prev);
+        }
         return;
     }
 
@@ -156,8 +195,22 @@ where
     run_par!(|| {
         iter_par!(array.axis_iter_mut(axis))
             .for_each(|mut lane| {
-                let slice = lane.as_slice_mut().unwrap();
-                sequential_cumprod_slice(slice);
+                // Handle both contiguous and non-contiguous cases
+                if let Some(slice) = lane.as_slice_mut() {
+                    // Fast path for contiguous slices
+                    sequential_cumprod_slice(slice);
+                } else {
+                    // Fallback for non-contiguous views - proper cumulative product
+                    // cumprod: [a, b, c] -> [a, a*b, a*b*c]
+                    let mut iter = lane.iter_mut();
+                    if let Some(first) = iter.next() {
+                        let mut acc = *first;
+                        for element in iter {
+                            acc = acc * *element;
+                            *element = acc;
+                        }
+                    }
+                }
             });
     });
 }

@@ -1,5 +1,6 @@
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![recursion_limit = "256"]
 
 //! Burn JIT Backend
 
