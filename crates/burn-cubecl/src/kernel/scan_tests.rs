@@ -9,11 +9,11 @@ mod scan_tests {
     fn test_scan_config_creation() {
         // Test that we can create scan configurations
         let config_add = ScanConfig::new(ScanOp::Add, 0);
-        assert_eq!(config_add.operation, ScanOp::Add);
+        assert_eq!(config_add.op, ScanOp::Add);
         assert_eq!(config_add.dim, 0);
         
         let config_mul = ScanConfig::new(ScanOp::Mul, 1);
-        assert_eq!(config_mul.operation, ScanOp::Mul);
+        assert_eq!(config_mul.op, ScanOp::Mul);
         assert_eq!(config_mul.dim, 1);
     }
 
@@ -42,10 +42,10 @@ mod scan_tests {
             let min_config = ScanConfig::new(ScanOp::Min, 0);
             
             // Verify configurations are created correctly
-            assert_eq!(add_config.operation, ScanOp::Add);
-            assert_eq!(mul_config.operation, ScanOp::Mul);
-            assert_eq!(max_config.operation, ScanOp::Max);
-            assert_eq!(min_config.operation, ScanOp::Min);
+            assert_eq!(add_config.op, ScanOp::Add);
+            assert_eq!(mul_config.op, ScanOp::Mul);
+            assert_eq!(max_config.op, ScanOp::Max);
+            assert_eq!(min_config.op, ScanOp::Min);
             
             // Test analytical expectations
             // If we have input [2, 3, 1, 4], our GPU kernel should produce:

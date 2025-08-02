@@ -90,6 +90,15 @@ paste = { workspace = true, optional = true }
 serial_test = { workspace = true, optional = true }
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+burn-ndarray = { path = "../burn-ndarray", features = ["std"] }
+burn-wgpu = { path = "../burn-wgpu" }
+burn-tensor = { path = "../burn-tensor" }
+rayon = "1.8"
+
+[[bench]]
+name = "scan"
+harness = false
 
 [package.metadata.docs.rs]
 features = ["doc"]

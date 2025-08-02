@@ -121,14 +121,14 @@ mod scan_tests {
     fn test_scan_config() {
         // Test ScanConfig creation and properties
         let config_add = ScanConfig::new(ScanOp::Add, 0);
-        assert_eq!(config_add.operation, ScanOp::Add);
+        assert_eq!(config_add.op, ScanOp::Add);
         assert_eq!(config_add.dim, 0);
-        assert_eq!(config_add.exclusive, false);
+        assert_eq!(config_add.inclusive, true);
         
         let config_mul = ScanConfig::new(ScanOp::Mul, 1);
-        assert_eq!(config_mul.operation, ScanOp::Mul);
+        assert_eq!(config_mul.op, ScanOp::Mul);
         assert_eq!(config_mul.dim, 1);
-        assert_eq!(config_mul.exclusive, false);
+        assert_eq!(config_mul.inclusive, true);
     }
 
     /// Test analytical cases with well-known mathematical properties

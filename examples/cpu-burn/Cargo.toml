@@ -1,0 +1,8 @@
+[package]
+name = "cpu-burn"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+burn-ndarray = { path = "../../crates/burn-ndarray" }
+burn-tensor = { path = "../../crates/burn-tensor" }

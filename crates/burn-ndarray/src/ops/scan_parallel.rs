@@ -1,12 +1,12 @@
 //! Parallel scan operations for ndarray backend using Rayon
 //! 
-//! This module provides optimized parallel implementations of cumulative operations
-//! that leverage multiple CPU cores through Rayon's work-stealing scheduler.
+//! This module provides parallel implementations of cumulative operations
+//! using Rayon's work-stealing scheduler.
 //! 
-//! Key features:
-//! - Intelligent threshold-based selection between parallel and sequential execution
-//! - Divide-and-conquer parallel prefix computation with O(log n) depth
-//! - Optimal chunk sizing based on available CPU cores
+//! Features:
+//! - Threshold-based selection between parallel and sequential execution
+//! - Divide-and-conquer parallel prefix computation
+//! - Rayon-based chunk processing
 //! - Support for cumsum and cumprod operations
 
 use crate::{element::NdArrayElement, tensor::NdArrayTensor};
@@ -17,12 +17,19 @@ use num_traits::{Zero, One};
 use burn_common::rayon::prelude::*;
 
 /// Minimum number of elements to consider parallel processing
-const PARALLEL_THRESHOLD: usize = 1000; // Much lower threshold
+/// Threshold for parallel execution
+/// Below this size, sequential processing is used for better performance
+const PARALLEL_THRESHOLD: usize = 1000;
 
 /// Minimum elements per thread for efficient parallelization
 const MIN_ELEMENTS_PER_THREAD: usize = 1000;
 
-/// Parallel cumulative sum implementation using divide-and-conquer strategy
+/// Parallel cumulative sum along the specified dimension using Rayon
+/// 
+/// Uses divide-and-conquer approach for parallel prefix computation:
+/// 1. Chunks array into parallel segments  
+/// 2. Computes prefix sums within each chunk
+/// 3. Propagates prefix values between chunks
 pub(crate) fn cumsum_dim_parallel<E: NdArrayElement>(
     tensor: NdArrayTensor<E>,
     dim: usize,

@@ -5,6 +5,7 @@ mod int_tensor;
 mod module;
 mod qtensor;
 mod scan_tests;
+mod scan_parallel;
 #[cfg(feature = "simd")]
 mod simd;
 mod tensor;
