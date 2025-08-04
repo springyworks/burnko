@@ -1,9 +1,9 @@
 use super::cat::cat_with_slice_assign;
 use super::repeat_dim::repeat_with_slice_assign;
 use super::scan::{
-    cumsum_with_slice_assign, cummax_with_slice_assign, cummin_with_slice_assign,
-    cumprod_with_slice_assign, scan_with_slice_assign, ScanConfig,
+    scan_with_slice_assign, ScanConfig,
 };
+use super::fft::{fft_with_slice_assign, ifft_with_slice_assign};
 use super::{BoolTensor, Device, FloatElem, FloatTensor, IntElem, IntTensor};
 use crate::{Distribution, ElementConversion, Float, TensorData, backend::Backend, tensor::Shape};
 use crate::{FloatDType, TensorMetadata, TensorPrimitive};
@@ -1414,5 +1414,34 @@ pub trait FloatTensorOps<B: Backend> {
     /// A tensor with the same shape as the input tensor the indices map back to the original input tensor.
     fn float_argsort(tensor: FloatTensor<B>, dim: usize, descending: bool) -> IntTensor<B> {
         argsort::<B, Float>(TensorPrimitive::Float(tensor), dim, descending)
+    }
+
+    /// Computes the 1D Fast Fourier Transform (FFT) along the specified dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The input tensor (real values).
+    /// * `dim` - The dimension along which to compute the FFT.
+    ///
+    /// # Returns
+    ///
+    /// A complex tensor where the last dimension has size 2 (real, imaginary components).
+    /// The output shape is `input_shape` with an additional dimension of size 2.
+    fn float_fft(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
+        fft_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
+    }
+
+    /// Computes the 1D Inverse Fast Fourier Transform (IFFT) along the specified dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The input complex tensor (last dimension size 2: real, imaginary).
+    /// * `dim` - The dimension along which to compute the IFFT.
+    ///
+    /// # Returns
+    ///
+    /// A real tensor with the complex dimension removed.
+    fn float_ifft(tensor: FloatTensor<B>, dim: usize) -> FloatTensor<B> {
+        ifft_with_slice_assign::<B, Float>(TensorPrimitive::Float(tensor), dim).tensor()
     }
 }

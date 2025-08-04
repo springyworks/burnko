@@ -1,0 +1,9 @@
+[package]
+name = "heavy_lifting_test"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+burn-tensor = { path = "../crates/burn-tensor" }
+burn-ndarray = { path = "../crates/burn-ndarray" }
+burn-wgpu = { path = "../crates/burn-wgpu" }

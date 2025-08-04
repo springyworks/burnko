@@ -1,0 +1,9 @@
+[package]
+name = "rayon-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+burn-ndarray = { path = "crates/burn-ndarray", features = ["rayon"] }
+burn-tensor = { path = "crates/burn-tensor" }
+rayon = "1.0"

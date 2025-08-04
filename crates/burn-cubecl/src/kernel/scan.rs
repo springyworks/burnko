@@ -225,43 +225,97 @@ pub fn scan_parallel_dim_kernel<F: Float>(
             sync_cube();
         }
     } else {
-        // Large arrays: Use chunked processing with sequential fallback for correctness
-        // First copy input to output
-        let elements_per_thread = (scan_dim_size + cube_size - 1) / cube_size;
+        // Large arrays: Simple parallel chunked approach - ALL THREADS WORK!
+        let chunk_size = (scan_dim_size + cube_size - 1) / cube_size;
         
-        for i in 0..elements_per_thread {
-            let global_idx = thread_id + i * cube_size;
-            if global_idx < scan_dim_size {
-                let element_idx = base_offset + global_idx * stride;
+        // Step 1: Each thread handles its chunk - copy input to output first
+        for i in 0..chunk_size {
+            let idx = thread_id * chunk_size + i;
+            if idx < scan_dim_size {
+                let element_idx = base_offset + idx * stride;
                 output[element_idx] = input[element_idx];
             }
         }
         
         sync_cube();
         
-        // For large arrays, use a simpler approach: let thread 0 do sequential scan
-        // This ensures correctness while we work on a more advanced parallel chunked algorithm
-        if thread_id == 0 {
-            for i in 1..scan_dim_size {
-                let current_idx = base_offset + i * stride;
-                let prev_idx = base_offset + (i - 1) * stride;
+        // Step 2: Each thread does local scan on its chunk
+        for i in 1..chunk_size {
+            let idx = thread_id * chunk_size + i;
+            if idx < scan_dim_size {
+                let current_idx = base_offset + idx * stride;
+                let prev_idx = base_offset + (idx - 1) * stride;
                 
                 let prev_val = output[prev_idx];
                 let curr_val = output[current_idx];
                 
-                let new_val = match operation {
+                output[current_idx] = match operation {
                     ScanOp::Add => prev_val + curr_val,
                     ScanOp::Mul => prev_val * curr_val,
-                    ScanOp::Max => {
-                        if prev_val > curr_val { prev_val } else { curr_val }
-                    }
-                    ScanOp::Min => {
-                        if prev_val < curr_val { prev_val } else { curr_val }
-                    }
+                    ScanOp::Max => if prev_val > curr_val { prev_val } else { curr_val },
+                    ScanOp::Min => if prev_val < curr_val { prev_val } else { curr_val },
                     _ => curr_val,
                 };
+            }
+        }
+        
+        sync_cube();
+        
+        // Step 3: Get chunk totals and do parallel scan on them
+        let mut shared_totals = SharedMemory::<F>::new(256);
+        
+        // Each thread stores its chunk's last value
+        let last_idx = thread_id * chunk_size + chunk_size - 1;
+        if last_idx < scan_dim_size {
+            let last_element_idx = base_offset + last_idx * stride;
+            shared_totals[thread_id] = output[last_element_idx];
+        } else {
+            shared_totals[thread_id] = match operation {
+                ScanOp::Add => F::new(0.0),
+                ScanOp::Mul => F::new(1.0),
+                _ => F::new(0.0),
+            };
+        }
+        
+        sync_cube();
+        
+        // Parallel scan on chunk totals - Hillis-Steele
+        let mut step = 1u32;
+        while step < cube_size {
+            if thread_id >= step {
+                let prev_val = shared_totals[thread_id - step];
+                let curr_val = shared_totals[thread_id];
                 
-                output[current_idx] = new_val;
+                shared_totals[thread_id] = match operation {
+                    ScanOp::Add => prev_val + curr_val,
+                    ScanOp::Mul => prev_val * curr_val,
+                    ScanOp::Max => if prev_val > curr_val { prev_val } else { curr_val },
+                    ScanOp::Min => if prev_val < curr_val { prev_val } else { curr_val },
+                    _ => curr_val,
+                };
+            }
+            step *= 2;
+            sync_cube();
+        }
+        
+        // Step 4: Add prefix to all elements in later chunks
+        if thread_id > 0 {
+            let prefix = shared_totals[thread_id - 1];
+            
+            for i in 0..chunk_size {
+                let idx = thread_id * chunk_size + i;
+                if idx < scan_dim_size {
+                    let element_idx = base_offset + idx * stride;
+                    let curr_val = output[element_idx];
+                    
+                    output[element_idx] = match operation {
+                        ScanOp::Add => prefix + curr_val,
+                        ScanOp::Mul => prefix * curr_val,
+                        ScanOp::Max => if prefix > curr_val { prefix } else { curr_val },
+                        ScanOp::Min => if prefix < curr_val { prefix } else { curr_val },
+                        _ => curr_val,
+                    };
+                }
             }
         }
     }

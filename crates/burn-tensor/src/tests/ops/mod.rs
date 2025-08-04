@@ -57,6 +57,7 @@ mod repeat_dim;
 mod reshape;
 mod roll;
 mod round;
+mod scan;
 mod select;
 mod sign;
 mod sin;

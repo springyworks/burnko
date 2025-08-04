@@ -10,6 +10,7 @@ use crate::element::{ExpElement, FloatNdArrayElement, IntNdArrayElement, QuantEl
 use crate::{NdArray, tensor::NdArrayTensor};
 use crate::{NdArrayDevice, NdArrayTensorFloat, SEED, execute_with_float_dtype};
 use crate::ops::macros::{cumsum_dim, cumprod_dim, cummax_dim, cummin_dim};
+use crate::ops::fft::{fft_dim, ifft_dim};
 
 // Workspace crates
 use burn_common::rand::get_seeded_rng;
@@ -607,5 +608,15 @@ impl<E: FloatNdArrayElement, I: IntNdArrayElement, Q: QuantElement> FloatTensorO
         dim: usize,
     ) -> FloatTensor<Self> {
         execute_with_float_dtype!(tensor, |tensor| cummin_dim(tensor, dim))
+    }
+
+    fn float_fft(tensor: FloatTensor<Self>, dim: usize) -> FloatTensor<Self> {
+        println!("NdArray backend float_fft called with dim: {}", dim);
+        execute_with_float_dtype!(tensor, |tensor| fft_dim(tensor, dim))
+    }
+
+    fn float_ifft(tensor: FloatTensor<Self>, dim: usize) -> FloatTensor<Self> {
+        println!("NdArray backend float_ifft called with dim: {}", dim);
+        execute_with_float_dtype!(tensor, |tensor| ifft_dim(tensor, dim))
     }
 }

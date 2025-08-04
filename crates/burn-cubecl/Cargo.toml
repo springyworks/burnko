@@ -95,9 +95,26 @@ burn-ndarray = { path = "../burn-ndarray", features = ["std"] }
 burn-wgpu = { path = "../burn-wgpu" }
 burn-tensor = { path = "../burn-tensor" }
 rayon = "1.8"
+comfy-table = "7.1"
 
 [[bench]]
 name = "scan"
+harness = false
+
+[[bench]]
+name = "cpu_vs_gpu_scan_benchmark"
+harness = false
+
+[[bench]]
+name = "cpu_vs_gpu_stress_benchmark"
+harness = false
+
+[[bench]]
+name = "ultimate_cpu_vs_gpu"
+harness = false
+
+[[bench]]
+name = "comprehensive_cpu_vs_gpu"
 harness = false
 
 [package.metadata.docs.rs]

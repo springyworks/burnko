@@ -24,6 +24,8 @@ pub use burn_common::PLANE_DIM_APPROX;
 
 /// Convolution kernels
 pub mod conv;
+/// Fast Fourier Transform operations
+pub mod fft;
 /// Interpolation kernels
 pub mod interpolate;
 /// Matmul kernels
@@ -40,8 +42,8 @@ pub mod reduce;
 pub mod scan;
 
 #[cfg(test)]
-/// Tests for scan operations
-pub mod scan_tests;
+/// Tests for FFT operations
+pub mod fft_tests;
 
 pub(crate) use clamp::*;
 pub(crate) use comparison::*;

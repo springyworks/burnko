@@ -113,6 +113,9 @@ pub(crate) fn cummax_dim<E: NdArrayElement + PartialOrd>(
     tensor: NdArrayTensor<E>,
     dim: usize,
 ) -> NdArrayTensor<E> {
+    // TODO: Implement parallel cummax using burn_common::{run_par, iter_par} 
+    // similar to cumsum_dim_parallel and cumprod_dim_parallel in scan_parallel.rs
+    // for multi-core performance on large arrays
     let axis = Axis(dim);
     let mut array = tensor.array.into_owned();
     array.accumulate_axis_inplace(axis, |&prev, curr| {
@@ -128,6 +131,9 @@ pub(crate) fn cummin_dim<E: NdArrayElement + PartialOrd>(
     tensor: NdArrayTensor<E>,
     dim: usize,
 ) -> NdArrayTensor<E> {
+    // TODO: Implement parallel cummin using burn_common::{run_par, iter_par}
+    // similar to cumsum_dim_parallel and cumprod_dim_parallel in scan_parallel.rs
+    // for multi-core performance on large arrays
     let axis = Axis(dim);
     let mut array = tensor.array.into_owned();
     array.accumulate_axis_inplace(axis, |&prev, curr| {

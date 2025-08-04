@@ -703,4 +703,28 @@ where
             _ => unimplemented!("Unsupported floating point type cast"),
         }
     }
+
+    fn float_fft(tensor: FloatTensor<Self>, fft_dim: usize) -> FloatTensor<Self> {
+        use crate::kernel::fft::gpu_fft;
+        
+        execute_with_dtype!(
+            float(tensor.dtype),
+            E,
+            {
+                gpu_fft::<R, E>(tensor, fft_dim)
+            }
+        )
+    }
+
+    fn float_ifft(tensor: FloatTensor<Self>, fft_dim: usize) -> FloatTensor<Self> {
+        use crate::kernel::fft::gpu_ifft;
+        
+        execute_with_dtype!(
+            float(tensor.dtype),
+            E,
+            {
+                gpu_ifft::<R, E>(tensor, fft_dim)
+            }
+        )
+    }
 }

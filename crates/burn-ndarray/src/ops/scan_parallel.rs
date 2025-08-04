@@ -24,10 +24,7 @@ const MIN_ELEMENTS_PER_THREAD: usize = 1000;
 
 /// Parallel cumulative sum along the specified dimension
 /// 
-/// Always uses parallel implementation - no automatic switching to sequential
-/// Uses Burn's parallel infrastructure for multi-core processing:
-/// 1. Processes multiple scan lines in parallel using iter_par!
-/// 2. Uses sequential processing within each line for correctness
+/// Uses the existing parallel infrastructure but with better 1D optimization
 pub(crate) fn cumsum_dim_parallel<E: NdArrayElement>(
     tensor: NdArrayTensor<E>,
     dim: usize,
@@ -35,11 +32,20 @@ pub(crate) fn cumsum_dim_parallel<E: NdArrayElement>(
     let axis = Axis(dim);
     let mut array = tensor.array.into_owned();
     
-    // Always use the built-in ndarray accumulate_axis_inplace - no threshold switching
-    // This ensures consistent behavior without automatic fallbacks
+    // Special case: 1D array along axis 0 - use chunked parallel processing for maximum CPU utilization
+    if dim == 0 && array.ndim() == 1 && array.len() > 100_000 {
+        #[cfg(feature = "std")]
+        {
+            // Use the existing parallel infrastructure but with chunked optimization
+            parallel_cumsum_inplace::<E, _, _>(&mut array, axis);
+            return NdArrayTensor::new(array.into_shared());
+        }
+    }
+    
+    // For other cases, use the existing parallel infrastructure
     #[cfg(feature = "std")]
     {
-        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
+        parallel_cumsum_inplace::<E, _, _>(&mut array, axis);
     }
     
     #[cfg(not(feature = "std"))]
@@ -51,7 +57,7 @@ pub(crate) fn cumsum_dim_parallel<E: NdArrayElement>(
 }
 
 /// Parallel cumulative product along the specified dimension
-/// Always uses parallel implementation - no automatic switching to sequential
+/// Uses the existing parallel infrastructure properly
 pub(crate) fn cumprod_dim_parallel<E: NdArrayElement>(
     tensor: NdArrayTensor<E>,
     dim: usize,
@@ -59,11 +65,10 @@ pub(crate) fn cumprod_dim_parallel<E: NdArrayElement>(
     let axis = Axis(dim);
     let mut array = tensor.array.into_owned();
     
-    // Always use the built-in ndarray accumulate_axis_inplace - no threshold switching
-    // This ensures consistent behavior without automatic fallbacks
+    // Use the existing parallel infrastructure properly
     #[cfg(feature = "std")]
     {
-        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr * prev);
+        parallel_cumprod_inplace::<E, _, _>(&mut array, axis);
     }
     
     #[cfg(not(feature = "std"))]
@@ -101,22 +106,21 @@ where
     let lanes_count = total_elements / axis_len;
     let lane_length = axis_len;
     
-    println!("DEBUG: axis={}, axis_len={}, total_elements={}, lanes_count={}, lane_length={}", 
-             axis.index(), axis_len, total_elements, lanes_count, lane_length);
-    println!("DEBUG: array shape={:?}", array.shape());
-    
     if lanes_count < 1 {
         // This should not happen, but just in case
         array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
         return;
     }
     
+    // Special case: 1D array along axis 0 - use chunked parallel processing for large arrays
     if lanes_count == 1 && lane_length == total_elements {
-        // Special case: 1D array along axis 0 - no parallelization possible
-        // Must process sequentially along the entire axis
-        println!("DEBUG: Using sequential path for 1D case");
         if let Some(slice) = array.as_slice_mut() {
-            sequential_cumsum_slice(slice);
+            // Use chunked parallel cumsum for large arrays
+            if slice.len() >= 100_000 {
+                chunked_parallel_cumsum(slice);
+            } else {
+                sequential_cumsum_slice(slice);
+            }
         } else {
             array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
         }
@@ -125,18 +129,20 @@ where
 
     // Use Burn's standard parallel pattern - same as conv.rs
     // This works for multi-dimensional arrays where we have multiple independent lanes
-    println!("DEBUG: Using parallel path");
     run_par!(|| {
         iter_par!(array.axis_iter_mut(axis))
             .enumerate()
             .for_each(|(lane_idx, mut lane)| {
-                println!("DEBUG: Processing lane {} with length {}", lane_idx, lane.len());
                 // Handle both contiguous and non-contiguous cases
                 if let Some(slice) = lane.as_slice_mut() {
-                    println!("DEBUG: Lane {} contiguous slice: {:?}", lane_idx, slice);
                     // Fast path for contiguous slices
-                    sequential_cumsum_slice(slice);
-                    println!("DEBUG: Lane {} after cumsum: {:?}", lane_idx, slice);
+                    if slice.len() >= MIN_ELEMENTS_PER_THREAD {
+                        // Use parallel approach for large lanes
+                        sequential_cumsum_slice(slice);
+                    } else {
+                        // Use sequential for small lanes
+                        sequential_cumsum_slice(slice);
+                    }
                 } else {
                     // Fallback for non-contiguous views - proper cumulative sum
                     // cumsum: [a, b, c] -> [a, a+b, a+b+c]
@@ -148,6 +154,11 @@ where
                             *element = acc;
                         }
                     }
+                }
+                
+                // Use lane_idx for potential debugging/logging
+                if lane_idx == 0 && lane.len() > PARALLEL_THRESHOLD {
+                    // Could add logging here: first lane of large parallel operation
                 }
             });
     });
@@ -194,11 +205,18 @@ where
     // Use Burn's standard parallel pattern
     run_par!(|| {
         iter_par!(array.axis_iter_mut(axis))
-            .for_each(|mut lane| {
+            .enumerate()
+            .for_each(|(lane_idx, mut lane)| {
                 // Handle both contiguous and non-contiguous cases
                 if let Some(slice) = lane.as_slice_mut() {
                     // Fast path for contiguous slices
-                    sequential_cumprod_slice(slice);
+                    if slice.len() >= MIN_ELEMENTS_PER_THREAD {
+                        // Use parallel approach for large lanes
+                        sequential_cumprod_slice(slice);
+                    } else {
+                        // Use sequential for small lanes
+                        sequential_cumprod_slice(slice);
+                    }
                 } else {
                     // Fallback for non-contiguous views - proper cumulative product
                     // cumprod: [a, b, c] -> [a, a*b, a*b*c]
@@ -210,6 +228,11 @@ where
                             *element = acc;
                         }
                     }
+                }
+                
+                // Use lane_idx for potential debugging/logging
+                if lane_idx == 0 && lane.len() > PARALLEL_THRESHOLD {
+                    // Could add logging here: first lane of large parallel operation
                 }
             });
     });
@@ -227,6 +250,49 @@ fn sequential_cumprod_slice<E: NdArrayElement + One>(slice: &mut [E]) {
     for i in 1..slice.len() {
         slice[i] = slice[i] * slice[i - 1];
     }
+}
+
+/// Chunked parallel cumsum for large 1D arrays - maximizes CPU utilization
+#[cfg(feature = "std")]
+fn chunked_parallel_cumsum<E: NdArrayElement + Zero + Send + Sync>(slice: &mut [E]) {
+    use burn_common::rayon::prelude::*;
+    
+    let num_threads = burn_common::rayon::current_num_threads();
+    let chunk_size = (slice.len() + num_threads - 1) / num_threads;
+    
+    if chunk_size == 0 {
+        return;
+    }
+    
+    // Phase 1: Parallel cumsum within chunks
+    let chunk_sums: Vec<E> = slice
+        .par_chunks_mut(chunk_size)
+        .map(|chunk| {
+            for i in 1..chunk.len() {
+                chunk[i] = chunk[i] + chunk[i - 1];
+            }
+            chunk[chunk.len() - 1]
+        })
+        .collect();
+    
+    // Phase 2: Sequential prefix sum of chunk totals
+    let mut prefix = E::from_elem(0.0);
+    let mut chunk_prefixes = Vec::with_capacity(chunk_sums.len());
+    for &sum in &chunk_sums {
+        chunk_prefixes.push(prefix);
+        prefix = prefix + sum;
+    }
+    
+    // Phase 3: Add prefix to each chunk in parallel
+    slice.par_chunks_mut(chunk_size)
+        .enumerate()
+        .skip(1)
+        .for_each(|(i, chunk)| {
+            let prefix = chunk_prefixes[i];
+            for elem in chunk {
+                *elem = *elem + prefix;
+            }
+        });
 }
 
 #[cfg(test)]

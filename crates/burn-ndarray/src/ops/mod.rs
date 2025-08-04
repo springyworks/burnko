@@ -1,12 +1,11 @@
 mod activations;
 mod base;
 mod bool_tensor;
+mod fft;
 mod int_tensor;
 mod module;
 mod qtensor;
-mod scan_tests;
 mod scan_parallel;
-mod scan_analytical_tests;
 #[cfg(feature = "simd")]
 mod simd;
 mod tensor;

@@ -16,6 +16,7 @@ members = [
 
 exclude = [
     "examples/notebook",
+    "heavy_lifting_test",
 ]
 
 [workspace.package]
