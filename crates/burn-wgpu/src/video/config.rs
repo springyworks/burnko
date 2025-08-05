@@ -166,17 +166,29 @@ impl ColorMap {
     }
 }
 
-/// Frame timing and performance metrics
-#[derive(Debug, Default)]
+/// Performance tracking metrics
+#[derive(Debug, Clone)]
 pub struct VideoMetrics {
-    /// Total frames rendered
-    pub frames_rendered: u64,
-    /// Total frames dropped due to performance
+    /// Number of frames produced
+    pub frames_produced: u64,
+    /// Number of frames dropped due to performance
     pub frames_dropped: u64,
     /// Average frame time in milliseconds
-    pub avg_frame_time: Duration,
-    /// GPU memory usage for video pipeline
-    pub gpu_memory_usage: u64,
+    pub avg_frame_time_ms: f32,
+    /// Current frames per second
+    pub current_fps: f32,
     /// Last update timestamp
     pub last_update: std::time::Instant,
+}
+
+impl Default for VideoMetrics {
+    fn default() -> Self {
+        Self {
+            frames_produced: 0,
+            frames_dropped: 0,
+            avg_frame_time_ms: 16.67, // 60 FPS target
+            current_fps: 0.0,
+            last_update: std::time::Instant::now(),
+        }
+    }
 }

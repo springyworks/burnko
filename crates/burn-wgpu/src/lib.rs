@@ -15,6 +15,7 @@ pub use cubecl::CubeDim;
 pub use cubecl::flex32;
 
 // WGPU Direct Video Pipeline for real-time tensor visualization
+#[cfg(feature = "video")]
 pub mod video;
 
 pub use cubecl::wgpu::{

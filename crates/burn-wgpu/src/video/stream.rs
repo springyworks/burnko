@@ -1,152 +1,138 @@
 //! Video stream management for real-time tensor visualization
 
-use super::{VideoConfig, VideoMetrics, TensorTexture, TensorTextureConverter, ColorMap};
+use super::{VideoConfig, VideoMetrics, TensorTextureConverter, ColorMap};
 use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
+use std::time::Instant;
+use burn_tensor::{backend::Backend, Tensor};
+
+/// Frame data for the video stream
+#[derive(Clone)]
+pub struct Frame {
+    /// Raw frame data
+    pub data: Vec<u8>,
+    /// Timestamp when frame was created
+    pub timestamp: Instant,
+    /// Unique frame identifier
+    pub frame_id: u64,
+}
+
+/// Frame buffer for managing video frames
+pub struct FrameBuffer {
+    /// Maximum buffer size
+    max_size: usize,
+    /// Frame queue
+    frames: VecDeque<Frame>,
+    /// Next frame ID
+    next_frame_id: u64,
+}
+
+impl FrameBuffer {
+    /// Create a new frame buffer
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            max_size,
+            frames: VecDeque::new(),
+            next_frame_id: 0,
+        }
+    }
+
+    /// Add a new frame to the buffer
+    pub fn push_frame(&mut self, data: Vec<u8>) {
+        let frame = Frame {
+            data,
+            timestamp: Instant::now(),
+            frame_id: self.next_frame_id,
+        };
+        
+        self.next_frame_id += 1;
+        
+        // Remove old frames if buffer is full
+        while self.frames.len() >= self.max_size {
+            self.frames.pop_front();
+        }
+        
+        self.frames.push_back(frame);
+    }
+
+    /// Get the latest frame
+    pub fn latest_frame(&self) -> Option<&Frame> {
+        self.frames.back()
+    }
+
+    /// Get buffer size
+    pub fn size(&self) -> usize {
+        self.frames.len()
+    }
+}
 
 /// Main video stream for real-time tensor visualization
-pub struct VideoStream {
+pub struct VideoStream<'a> {
     /// Stream configuration
     config: VideoConfig,
-    /// Frame buffer for smooth streaming
+    /// Frame buffer for smooth streaming  
     frame_buffer: Arc<Mutex<FrameBuffer>>,
     /// Performance metrics
     metrics: Arc<Mutex<VideoMetrics>>,
     /// Current colormap
     colormap: ColorMap,
-    /// WGPU device for GPU operations
-    device: Arc<wgpu::Device>,
-    /// WGPU queue for command submission
-    queue: Arc<wgpu::Queue>,
-    /// Tensor-to-texture converter
-    converter: TensorTextureConverter,
+    /// WGPU device for GPU operations (placeholder for now)
+    device: Option<Arc<wgpu::Device>>,
+    /// WGPU queue for command submission (placeholder for now)
+    queue: Option<Arc<wgpu::Queue>>,
+    /// Tensor-to-texture converter (placeholder for now)
+    converter: Option<TensorTextureConverter>,
     /// Window surface (if outputting to window)
-    surface: Option<wgpu::Surface>,
+    surface: Option<wgpu::Surface<'a>>,
     /// Render pipeline for visualization
     render_pipeline: Option<wgpu::RenderPipeline>,
 }
 
-impl VideoStream {
+impl<'a> VideoStream<'a> {
     /// Create a new video stream with the specified configuration
     pub fn new(config: VideoConfig) -> Self {
-        // TODO: Initialize WGPU device and queue
-        // For now, we'll use placeholder values
-        let instance = wgpu::Instance::default();
-        
-        // This is a simplified initialization - in practice we'd want to
-        // integrate with the existing Burn WGPU device management
-        let (device, queue) = futures::executor::block_on(async {
-            let adapter = instance
-                .request_adapter(&wgpu::RequestAdapterOptions::default())
-                .await
-                .expect("Failed to find adapter");
-            
-            adapter
-                .request_device(&wgpu::DeviceDescriptor::default(), None)
-                .await
-                .expect("Failed to create device")
-        });
-        
-        let device = Arc::new(device);
-        let queue = Arc::new(queue);
-        let converter = TensorTextureConverter::new(device.clone(), queue.clone());
-        
+        let frame_buffer = Arc::new(Mutex::new(FrameBuffer::new(config.buffer_size)));
+        let metrics = Arc::new(Mutex::new(VideoMetrics::default()));
+
         Self {
-            config: config.clone(),
-            frame_buffer: Arc::new(Mutex::new(FrameBuffer::new(config.buffer_size))),
-            metrics: Arc::new(Mutex::new(VideoMetrics::default())),
-            colormap: ColorMap::default(),
-            device,
-            queue,
-            converter,
+            config,
+            frame_buffer,
+            metrics,
+            colormap: ColorMap::Viridis,
+            device: None,
+            queue: None,
+            converter: None,
             surface: None,
             render_pipeline: None,
         }
     }
 
-    /// Update the video stream with a new tensor frame
-    pub fn push_tensor_frame<F, I, BT>(
-        &mut self,
-        tensor: &crate::Tensor<crate::CubeBackend<crate::WgpuRuntime, F, I, BT>, 2>,
-    ) -> Result<(), VideoStreamError>
-    where
-        F: crate::FloatElement,
-        I: crate::IntElement,
-        BT: crate::BoolElement,
-    {
-        let start_time = Instant::now();
-        
-        // Convert tensor to texture
-        let texture = self.converter.convert(tensor)
-            .map_err(|e| VideoStreamError::TextureConversion(e.to_string()))?;
-        
-        // Create frame
-        let frame = Frame {
-            texture,
-            timestamp: start_time,
-            frame_id: {
-                let mut metrics = self.metrics.lock().unwrap();
-                metrics.frames_rendered += 1;
-                metrics.frames_rendered
-            },
-        };
-        
-        // Add to frame buffer
-        let mut buffer = self.frame_buffer.lock().unwrap();
-        let dropped = buffer.push_frame(frame);
-        
-        // Update metrics
-        {
-            let mut metrics = self.metrics.lock().unwrap();
-            if dropped {
-                metrics.frames_dropped += 1;
-            }
-            let frame_time = start_time.elapsed();
-            metrics.avg_frame_time = if metrics.frames_rendered == 1 {
-                frame_time
-            } else {
-                Duration::from_nanos(
-                    (metrics.avg_frame_time.as_nanos() as u64 + frame_time.as_nanos() as u64) / 2
-                )
-            };
-            metrics.last_update = Instant::now();
-        }
-        
-        Ok(())
-    }
-
-    /// Set the colormap for visualization
-    pub fn set_colormap(&mut self, colormap: ColorMap) {
-        self.colormap = colormap;
-        // TODO: Update render pipeline with new colormap shader
-    }
-
     /// Get current performance metrics
-    pub fn metrics(&self) -> VideoMetrics {
+    pub fn get_metrics(&self) -> VideoMetrics {
         self.metrics.lock().unwrap().clone()
     }
 
-    /// Start the rendering loop (for window output)
-    pub fn start_rendering(&mut self) -> Result<(), VideoStreamError> {
-        match &self.config.output {
-            super::VideoOutput::Window => {
-                self.setup_window_rendering()?;
-                // TODO: Start render loop in separate thread
-                Ok(())
-            }
-            super::VideoOutput::File(_) => {
-                // TODO: Setup file export pipeline
-                Err(VideoStreamError::UnsupportedOutput("File output not yet implemented".into()))
-            }
-            _ => Err(VideoStreamError::UnsupportedOutput("Output type not yet supported".into()))
-        }
-    }
+    /// Push a new tensor frame to the stream (placeholder implementation)
+    pub fn push_tensor_frame<B: Backend>(
+        &mut self, 
+        _tensor: &Tensor<B, 2>
+    ) -> Result<(), VideoStreamError> {
+        // TODO: Convert tensor to texture data and push to frame buffer
+        // For now, just create dummy frame data
+        let _frame_id = {
+            let mut buffer = self.frame_buffer.lock().unwrap();
+            let dummy_data = vec![0u8; 1024]; // Placeholder data
+            buffer.push_frame(dummy_data);
+            buffer.next_frame_id - 1
+        };
 
-    /// Setup window rendering surface and pipeline
-    fn setup_window_rendering(&mut self) -> Result<(), VideoStreamError> {
-        // TODO: Create window and surface
-        // TODO: Create render pipeline with tensor visualization shaders
+        // Update metrics
+        {
+            let mut metrics = self.metrics.lock().unwrap();
+            metrics.frames_produced += 1;
+            // TODO: Calculate actual FPS and frame times
+        }
+
         Ok(())
     }
 
@@ -159,149 +145,21 @@ impl VideoStream {
 
         if let Some(frame) = frame {
             // TODO: Render frame using the visualization pipeline
-            println!("Rendering frame {} with dimensions {:?}", 
-                     frame.frame_id, frame.texture.dimensions());
+            println!("Rendering frame {} with {} bytes of data", 
+                     frame.frame_id, frame.data.len());
         }
 
         Ok(())
     }
 }
 
-/// A single frame in the video stream
-#[derive(Clone)]
-pub struct Frame {
-    /// Texture containing tensor data
-    pub texture: TensorTexture,
-    /// When this frame was created
-    pub timestamp: Instant,
-    /// Unique frame identifier
-    pub frame_id: u64,
-}
-
-/// Frame buffer for smooth video streaming
-pub struct FrameBuffer {
-    /// Circular buffer of frames
-    frames: VecDeque<Frame>,
-    /// Maximum buffer size
-    max_size: usize,
-    /// Frame drop threshold
-    drop_threshold: f32,
-}
-
-impl FrameBuffer {
-    /// Create a new frame buffer
-    pub fn new(max_size: usize) -> Self {
-        Self {
-            frames: VecDeque::with_capacity(max_size),
-            max_size,
-            drop_threshold: 0.8, // Start dropping frames when 80% full
-        }
-    }
-
-    /// Push a new frame, potentially dropping old frames
-    /// Returns true if frames were dropped
-    pub fn push_frame(&mut self, frame: Frame) -> bool {
-        let mut dropped = false;
-        
-        // Check if we need to drop frames
-        let current_fill = self.frames.len() as f32 / self.max_size as f32;
-        if current_fill > self.drop_threshold {
-            // Drop oldest frames
-            while self.frames.len() >= self.max_size {
-                self.frames.pop_front();
-                dropped = true;
-            }
-        }
-
-        self.frames.push_back(frame);
-        dropped
-    }
-
-    /// Get the latest frame
-    pub fn latest_frame(&self) -> Option<&Frame> {
-        self.frames.back()
-    }
-
-    /// Get a frame by age (0 = latest, 1 = previous, etc.)
-    pub fn frame_by_age(&self, age: usize) -> Option<&Frame> {
-        if age < self.frames.len() {
-            self.frames.get(self.frames.len() - 1 - age)
-        } else {
-            None
-        }
-    }
-
-    /// Clear all frames
-    pub fn clear(&mut self) {
-        self.frames.clear();
-    }
-}
-
-/// Errors that can occur in video streaming
-#[derive(Debug, thiserror::Error)]
+/// Error types for video stream operations
+#[derive(Debug)]
 pub enum VideoStreamError {
-    #[error("Texture conversion failed: {0}")]
-    TextureConversion(String),
-    
-    #[error("Unsupported output type: {0}")]
-    UnsupportedOutput(String),
-    
-    #[error("WGPU error: {0}")]
-    WgpuError(#[from] wgpu::Error),
-    
-    #[error("Window creation failed: {0}")]
-    WindowError(String),
-    
-    #[error("Frame buffer overflow")]
+    /// Stream configuration error
+    ConfigError(String),
+    /// GPU operation failed
+    GpuError(String),
+    /// Frame buffer overflow
     BufferOverflow,
-}
-
-/// Builder for creating video streams with custom settings
-pub struct VideoStreamBuilder {
-    config: VideoConfig,
-}
-
-impl VideoStreamBuilder {
-    /// Create a new builder with default configuration
-    pub fn new() -> Self {
-        Self {
-            config: VideoConfig::default(),
-        }
-    }
-
-    /// Set video dimensions
-    pub fn dimensions(mut self, width: u32, height: u32) -> Self {
-        self.config.width = width;
-        self.config.height = height;
-        self
-    }
-
-    /// Set frame rate
-    pub fn fps(mut self, fps: u32) -> Self {
-        self.config.fps = fps;
-        self
-    }
-
-    /// Set output destination
-    pub fn output(mut self, output: super::VideoOutput) -> Self {
-        self.config.output = output;
-        self
-    }
-
-    /// Set buffer size
-    pub fn buffer_size(mut self, size: usize) -> Self {
-        self.config.buffer_size = size;
-        self
-    }
-
-    /// Build the video stream
-    pub fn build(self) -> VideoStream {
-        VideoStream::new(self.config)
-    }
-}
-
-impl Default for VideoStreamBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
 }

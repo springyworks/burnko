@@ -1,6 +1,6 @@
 //! Render pipeline for tensor visualization
 
-use super::{TensorTexture, ColorMap, VideoConfig};
+use super::{TensorTexture, ColorMap};
 use std::sync::Arc;
 
 /// Main render pipeline for tensor visualization
@@ -13,6 +13,8 @@ pub struct TensorRenderPipeline {
     bind_group_layout: wgpu::BindGroupLayout,
     /// Current colormap
     colormap: ColorMap,
+    /// Linear sampler for tensor textures
+    sampler: wgpu::Sampler,
 }
 
 impl TensorRenderPipeline {
@@ -36,7 +38,7 @@ impl TensorRenderPipeline {
                     },
                     count: None,
                 },
-                // Texture sampler
+                // Sampler
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -46,17 +48,27 @@ impl TensorRenderPipeline {
             ],
         });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Tensor Visualization Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Tensor Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
         });
 
-        // Create shader module with colormap-specific fragment shader
         let shader_source = Self::generate_shader_source(&colormap);
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Tensor Visualization Shader"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Tensor Visualization Pipeline Layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
         });
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -69,7 +81,7 @@ impl TensorRenderPipeline {
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: "fs_main",
+                entry_point: "fs_main", 
                 targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
                     blend: Some(wgpu::BlendState::REPLACE),
@@ -81,12 +93,16 @@ impl TensorRenderPipeline {
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
-                unclipped_depth: false,
                 polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
                 conservative: false,
             },
             depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
             multiview: None,
         });
 
@@ -95,19 +111,19 @@ impl TensorRenderPipeline {
             pipeline,
             bind_group_layout,
             colormap,
+            sampler,
         })
     }
 
-    /// Render a tensor texture to the given render pass
+    /// Render tensor texture to the specified render pass
     pub fn render(
         &self,
         tensor_texture: &TensorTexture,
         render_pass: &mut wgpu::RenderPass,
-        sampler: &wgpu::Sampler,
-    ) {
-        // Create bind group for this tensor
+    ) -> Result<(), RenderError> {
+        // Create bind group for this frame
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Tensor Visualization Bind Group"),
+            label: Some("Tensor Texture Bind Group"),
             layout: &self.bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -116,17 +132,20 @@ impl TensorRenderPipeline {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(sampler),
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
                 },
             ],
         });
 
+        // Set pipeline and bind group
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &bind_group, &[]);
         render_pass.draw(0..3, 0..1); // Full-screen triangle
+        
+        Ok(())
     }
 
-    /// Update the pipeline with a new colormap
+    /// Update the colormap (requires pipeline recreation)
     pub fn update_colormap(
         &mut self,
         colormap: ColorMap,
@@ -158,92 +177,55 @@ impl TensorRenderPipeline {
         };
 
         let colormap_call = match colormap {
-            ColorMap::Grayscale | ColorMap::Custom { .. } => colormap_function,
-            _ => format!("{}(value)", 
-                match colormap {
-                    ColorMap::Viridis => "viridis_colormap",
-                    ColorMap::Plasma => "plasma_colormap", 
-                    ColorMap::Hot => "hot_colormap",
-                    ColorMap::Cool => "cool_colormap",
-                    ColorMap::Jet => "jet_colormap",
-                    _ => unreachable!()
-                }
-            ),
+            ColorMap::Grayscale | ColorMap::Custom { .. } => colormap_function.clone(),
+            _ => "apply_colormap(value)".to_string(),
         };
 
-        format!(r#"
-// Vertex shader - generates full-screen triangle
+        format!(
+            r#"
+// Vertex shader for full-screen triangle
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {{
-    let uv = vec2<f32>(
-        f32((vertex_index << 1u) & 2u),
-        f32(vertex_index & 2u),
-    );
-    return vec4<f32>(uv * 2.0 - 1.0, 0.0, 1.0);
+    let x = f32((vertex_index & 1u) << 1u) - 1.0;
+    let y = f32((vertex_index & 2u)) - 1.0;
+    return vec4<f32>(x, y, 0.0, 1.0);
 }}
 
-// Colormap function
+// Fragment shader with colormap
+@group(0) @binding(0) var tensor_texture: texture_2d<f32>;
+@group(0) @binding(1) var tensor_sampler: sampler;
+
 {colormap_function}
 
-// Fragment shader - samples tensor and applies colormap
-@group(0) @binding(0)
-var tensor_texture: texture_2d<f32>;
-
-@group(0) @binding(1)
-var tensor_sampler: sampler;
-
 @fragment
-fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {{
-    let texture_size = textureDimensions(tensor_texture);
-    let uv = position.xy / vec2<f32>(f32(texture_size.x), f32(texture_size.y));
-    
-    // Sample tensor value
-    let tensor_value = textureSample(tensor_texture, tensor_sampler, uv).r;
-    
-    // Normalize value (assuming tensor values are in reasonable range)
-    // TODO: Add configurable normalization parameters
-    let value = clamp(tensor_value, 0.0, 1.0);
-    
-    // Apply colormap
+fn fs_main(@builtin(position) frag_coord: vec4<f32>) -> @location(0) vec4<f32> {{
+    let uv = frag_coord.xy / vec2<f32>(800.0, 600.0); // TODO: Use actual screen size
+    let value = textureSample(tensor_texture, tensor_sampler, uv).r;
     let color = {colormap_call};
-    
     return vec4<f32>(color, 1.0);
 }}
-"#, 
+"#,
             colormap_function = colormap_function,
             colormap_call = colormap_call
         )
     }
 }
 
-/// Errors that can occur in the render pipeline
-#[derive(Debug, thiserror::Error)]
-pub enum PipelineError {
-    #[error("WGPU error: {0}")]
-    WgpuError(#[from] wgpu::Error),
-    
-    #[error("Shader compilation failed: {0}")]
-    ShaderError(String),
-    
-    #[error("Unsupported colormap: {0}")]
-    UnsupportedColormap(String),
-}
-
-/// Render context for managing rendering state
-pub struct RenderContext {
+/// Render context for managing WGPU resources
+pub struct RenderContext<'a> {
     /// WGPU device
     pub device: Arc<wgpu::Device>,
     /// WGPU queue
     pub queue: Arc<wgpu::Queue>,
     /// Surface for window rendering
-    pub surface: Option<wgpu::Surface>,
+    pub surface: Option<wgpu::Surface<'a>>,
     /// Surface configuration
     pub surface_config: Option<wgpu::SurfaceConfiguration>,
     /// Linear sampler for tensor textures
     pub sampler: wgpu::Sampler,
 }
 
-impl RenderContext {
+impl<'a> RenderContext<'a> {
     /// Create a new render context
     pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -269,31 +251,26 @@ impl RenderContext {
     /// Setup surface for window rendering
     pub fn setup_surface(
         &mut self,
-        surface: wgpu::Surface,
+        surface: wgpu::Surface<'static>,
         width: u32,
         height: u32,
     ) -> Result<(), PipelineError> {
-        let surface_caps = surface.get_capabilities(&self.device.get_info().name);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_caps.formats[0]);
+        // For now, use a default surface format
+        // TODO: Get actual surface capabilities from adapter
+        let surface_format = wgpu::TextureFormat::Bgra8UnormSrgb;
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width,
             height,
-            present_mode: surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
+            present_mode: wgpu::PresentMode::Fifo, // VSync
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
+            desired_maximum_frame_latency: 2,
         };
 
         surface.configure(&self.device, &config);
-        
-        self.surface = Some(surface);
         self.surface_config = Some(config);
         
         Ok(())
@@ -303,4 +280,22 @@ impl RenderContext {
     pub fn surface_format(&self) -> Option<wgpu::TextureFormat> {
         self.surface_config.as_ref().map(|config| config.format)
     }
+}
+
+/// Error types for pipeline operations
+#[derive(Debug)]
+pub enum PipelineError {
+    /// WGPU operation failed
+    WgpuError(String),
+    /// Shader compilation failed
+    ShaderError(String),
+    /// Surface configuration failed
+    SurfaceError(String),
+}
+
+/// Error types for render operations
+#[derive(Debug)]
+pub enum RenderError {
+    /// Render operation failed
+    RenderFailed(String),
 }

@@ -4,18 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-burn = { path = "../../crates/burn", features = ["wgpu", "vision"] }
-burn-wgpu = { path = "../../crates/burn-wgpu", features = ["video"] }
-tokio = { version = "1.0", features = ["full"] }
+burn = { path = "../../crates/burn", features = ["wgpu"] }
 
-[[example]]
+[[bin]]
 name = "basic_tensor_stream"
-path = "examples/basic_tensor_stream.rs"
+path = "src/basic_tensor_stream.rs"
 
 [[example]]
-name = "training_visualization"
-path = "examples/training_visualization.rs"
-
-[[example]]
-name = "real_time_gradients"
-path = "examples/real_time_gradients.rs"
+name = "minimal_working"
+path = "examples/minimal_working.rs"
