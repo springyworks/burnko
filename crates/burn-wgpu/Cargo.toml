@@ -23,6 +23,8 @@ exclusive-memory-only = ["cubecl/exclusive-memory-only"]
 fusion = ["burn-fusion", "burn-cubecl/fusion"]
 std = ["burn-cubecl/std", "cubecl/std"]
 template = ["burn-cubecl/template", "cubecl/template"]
+# WGPU Direct Video Pipeline
+video = ["dep:thiserror", "dep:futures", "dep:wgpu"]
 
 # Backends
 metal = ["cubecl-msl"]
@@ -42,6 +44,11 @@ burn-fusion = { path = "../burn-fusion", version = "0.19.0", optional = true }
 burn-tensor = { path = "../burn-tensor", version = "0.19.0", default-features = false, features = [
     "cubecl-wgpu",
 ] }
+
+# Dependencies for WGPU Direct Video Pipeline
+thiserror = { version = "1.0", optional = true }
+futures = { version = "0.3", optional = true }
+wgpu = { version = "0.19", optional = true }
 
 
 [dev-dependencies]

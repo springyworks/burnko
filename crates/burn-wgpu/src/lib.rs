@@ -14,6 +14,9 @@ pub use burn_cubecl::{CubeBackend, tensor::CubeTensor};
 pub use cubecl::CubeDim;
 pub use cubecl::flex32;
 
+// WGPU Direct Video Pipeline for real-time tensor visualization
+pub mod video;
+
 pub use cubecl::wgpu::{
     AutoCompiler, MemoryConfiguration, RuntimeOptions, WgpuDevice, WgpuResource, WgpuRuntime,
     WgpuSetup, WgpuStorage, init_device, init_setup, init_setup_async,
