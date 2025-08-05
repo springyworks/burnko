@@ -1,9 +1,0 @@
-[package]
-name = "debug_cumsum_precision"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-burn-ndarray = { path = "../../crates/burn-ndarray", features = ["std"] }
-burn-wgpu = { path = "../../crates/burn-wgpu" }
-burn-tensor = { path = "../../crates/burn-tensor" }
