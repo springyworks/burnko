@@ -5,6 +5,17 @@ edition = "2021"
 
 [dependencies]
 burn = { path = "../../crates/burn", features = ["wgpu"] }
+burn-wgpu = { path = "../../crates/burn-wgpu" }
+burn-cubecl = { path = "../../crates/burn-cubecl" }
+burn-tensor = { path = "../../crates/burn-tensor" }
+cubecl = { git = "https://github.com/tracel-ai/cubecl", rev = "f1b0080edc55c9a0dd02fad333f81a02a200beea", features = ["wgpu"] }
+tokio = { version = "1.0", features = ["full"] }
+winit = "0.29"
+wgpu = "0.19"
+futures = "0.3"
+bytemuck = { version = "1.14", features = ["derive"] }
+pollster = "0.3"
+env_logger = "0.10"
 
 [[bin]]
 name = "basic_tensor_stream"
@@ -13,3 +24,23 @@ path = "src/basic_tensor_stream.rs"
 [[example]]
 name = "minimal_working"
 path = "examples/minimal_working.rs"
+
+[[example]]
+name = "simple_window"
+path = "examples/simple_window.rs"
+
+[[example]]
+name = "window_visualization"
+path = "examples/window_visualization.rs"
+
+[[example]]
+name = "real_rendering"
+path = "examples/real_rendering.rs"
+
+[[example]]
+name = "dual_purpose_demo"
+path = "examples/dual_purpose_demo.rs"
+
+[[example]]
+name = "single_shader_dual"
+path = "examples/single_shader_dual.rs"
