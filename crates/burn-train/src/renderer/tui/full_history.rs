@@ -106,7 +106,7 @@ impl FullHistoryPoints {
     }
 
     fn push(&mut self, (x, y): (f64, f64)) {
-        if x as usize % self.step_size != 0 {
+        if !(x as usize).is_multiple_of(self.step_size) {
             return;
         }
 
@@ -141,7 +141,7 @@ impl FullHistoryPoints {
         let mut min_y = f64::MAX;
 
         for (i, (x, y)) in self.points.drain(0..self.points.len()).enumerate() {
-            if i % 2 == 0 {
+            if i.is_multiple_of(2) {
                 if x > max_x {
                     max_x = x;
                 }

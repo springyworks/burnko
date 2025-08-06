@@ -65,10 +65,10 @@ pub(crate) fn slice_assign<R: CubeRuntime, E: CubeElement>(
             .iter()
             .filter(|it| {
                 let it = **it as usize;
-                shape % it == 0
+                shape.is_multiple_of(it)
                     && strides_compatible(&tensor.strides, it)
                     && strides_compatible(&value.strides, it)
-                    && offset % it == 0
+                    && offset.is_multiple_of(it)
             })
             .max()
             .unwrap_or(&1)
@@ -113,5 +113,5 @@ pub(crate) fn slice_assign<R: CubeRuntime, E: CubeElement>(
 fn strides_compatible(strides: &[usize], vec: usize) -> bool {
     strides
         .iter()
-        .all(|stride| *stride % vec == 0 || *stride == 1)
+        .all(|stride| stride.is_multiple_of(vec) || *stride == 1)
 }

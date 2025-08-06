@@ -1,12 +1,11 @@
 //! Single Shader Dual-Purpose Demo
 //! 
-//! This demonstrates the revolutionary concept: ONE SHADER used for BOTH:
+//! This demonstrates the concept: ONE SHADER used for BOTH:
 //! 1. Tensor computation (compute shader)
 //! 2. Real-time visualization (fragment shader)
 //! 
 //! The same GPU memory, same shader logic, dual purpose!
 
-use burn_wgpu::WgpuDevice;
 use std::sync::Arc;
 use std::time::Instant;
 use winit::{
@@ -14,8 +13,6 @@ use winit::{
     event_loop::EventLoop,
     window::WindowBuilder,
 };
-
-type Backend = burn_wgpu::Wgpu<f32>;
 
 // THE MAGIC: Single WGSL shader source used for BOTH compute AND graphics!
 const DUAL_PURPOSE_SHADER: &str = r#"
@@ -117,27 +114,22 @@ struct SingleShaderDemo {
     surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
     
-    // The magic: SAME shader module used for both pipelines!
-    shader_module: wgpu::ShaderModule,
-    
     // Dual pipelines using the SAME shader
     compute_pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
     
     // Shared resources
-    tensor_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     
     // Animation state
-    burn_device: WgpuDevice,
     frame_count: u32,
     start_time: Instant,
 }
 
 impl SingleShaderDemo {
     async fn new(window: Arc<winit::window::Window>) -> Self {
-        println!("🔥 REVOLUTIONARY CONCEPT: Single Shader Dual-Purpose!");
+        println!("🔥 CONCEPT: Single Shader Dual-Purpose!");
         println!("   This is what you asked for - ONE shader that does BOTH:");
         println!("   1. Tensor operations (compute shader)");
         println!("   2. Live visualization (graphics shader)");
@@ -303,21 +295,15 @@ impl SingleShaderDemo {
             multiview: None,
         });
 
-        // Initialize Burn device for compatibility
-        let burn_device = WgpuDevice::default();
-
         Self {
             device,
             queue,
             surface,
             surface_config,
-            shader_module,
             compute_pipeline,
             render_pipeline,
-            tensor_buffer,
             uniform_buffer,
             bind_group,
-            burn_device,
             frame_count: 0,
             start_time: Instant::now(),
         }
@@ -398,7 +384,7 @@ async fn main() {
     
     let event_loop = EventLoop::new().unwrap();
     let window = Arc::new(WindowBuilder::new()
-        .with_title("🔥 Single Shader Dual-Purpose Demo - Revolutionary!")
+        .with_title("🔥 Single Shader Dual-Purpose Demo")
         .with_inner_size(winit::dpi::LogicalSize::new(1024, 1024))
         .build(&event_loop)
         .unwrap());
@@ -410,7 +396,7 @@ async fn main() {
             Event::WindowEvent { event, window_id } if window_id == window.id() => {
                 match event {
                     WindowEvent::CloseRequested => {
-                        println!("🎉 Revolutionary single shader demo complete!");
+                        println!("🎉 Single shader demo complete!");
                         target.exit();
                     }
                     WindowEvent::Resized(physical_size) => {

@@ -3,12 +3,12 @@
 //! This module implements Fast Fourier Transform operations for GPU execution
 //! following Burn's established CubeCL patterns and the gpu-fft library approach.
 
+#![allow(missing_docs)] // Allow missing docs for cube macro-generated code
+
 use crate::{CubeRuntime, element::CubeElement, ops::numeric::empty_device, tensor::CubeTensor};
 use burn_tensor::Shape;
 use cubecl::{calculate_cube_count_elemwise, prelude::*};
-
-// PI constant for angle calculations
-const PI: f32 = 3.141592653589793;
+use std::f32::consts::PI;
 
 /// Basic FFT kernel using direct DFT computation
 /// Each thread computes one output frequency bin
@@ -48,8 +48,8 @@ pub fn fft_basic_kernel<F: Float>(
     // Normalization for inverse FFT
     if is_inverse {
         let norm = F::new(1.0) / F::cast_from(fft_size);
-        real = real * Line::new(norm);
-        imag = imag * Line::new(norm);
+        real *= Line::new(norm);
+        imag *= Line::new(norm);
     }
     
     // Store in interleaved format: [real0, imag0, real1, imag1, ...]
@@ -91,8 +91,8 @@ pub fn fft_optimized_kernel<F: Float>(
     
     if is_inverse {
         let norm = F::new(1.0) / F::cast_from(fft_size);
-        real = real * Line::new(norm);
-        imag = imag * Line::new(norm);
+        real *= Line::new(norm);
+        imag *= Line::new(norm);
     }
     
     output[idx * 2] = real;

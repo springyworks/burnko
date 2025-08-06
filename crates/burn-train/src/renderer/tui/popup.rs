@@ -58,13 +58,11 @@ impl PopupState {
             PopupState::Empty => {}
             PopupState::Full(_, callbacks) => {
                 for callback in callbacks.iter() {
-                    if let Event::Key(key) = event {
-                        if let KeyCode::Char(key) = &key.code {
-                            if &callback.trigger == key && callback.callback.call() {
+                    if let Event::Key(key) = event
+                        && let KeyCode::Char(key) = &key.code
+                            && &callback.trigger == key && callback.callback.call() {
                                 reset = true;
                             }
-                        }
-                    }
                 }
             }
         };

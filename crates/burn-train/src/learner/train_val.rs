@@ -202,11 +202,10 @@ impl<LC: LearnerComponents> Learner<LC> {
                 );
             }
 
-            if let Some(early_stopping) = &mut self.early_stopping {
-                if early_stopping.should_stop(epoch, &self.event_store) {
+            if let Some(early_stopping) = &mut self.early_stopping
+                && early_stopping.should_stop(epoch, &self.event_store) {
                     break;
                 }
-            }
         }
 
         // Signal training end. For the TUI renderer, this handles the exit & return to main screen.

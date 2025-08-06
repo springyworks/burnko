@@ -1,3 +1,10 @@
+//! GPU scan operations using CubeCL compute shaders
+//!
+//! This module implements parallel scan (prefix sum, cumsum, cumprod) operations for GPU execution
+//! using dimension-aware kernels that can handle arbitrary tensor shapes and scan dimensions.
+
+#![allow(missing_docs)] // Allow missing docs for cube macro-generated code
+
 use crate::{CubeRuntime, element::CubeElement, ops::numeric::empty_device, tensor::CubeTensor};
 use burn_tensor::ops::{ScanConfig, ScanOp};
 use cubecl::{calculate_cube_count_elemwise, prelude::*};
@@ -226,7 +233,7 @@ pub fn scan_parallel_dim_kernel<F: Float>(
         }
     } else {
         // Large arrays: Simple parallel chunked approach - ALL THREADS WORK!
-        let chunk_size = (scan_dim_size + cube_size - 1) / cube_size;
+        let chunk_size = (scan_dim_size + cube_size - 1) / cube_size; // Manual div_ceil
         
         // Step 1: Each thread handles its chunk - copy input to output first
         for i in 0..chunk_size {

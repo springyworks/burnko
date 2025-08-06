@@ -62,7 +62,7 @@ fn conv2d<E: VMulAdd + Element, T: Element>(
 
     let (lanes, accelerated) = precheck::<E>(PhantomData);
 
-    if !accelerated || channels_per_group % lanes != 0 {
+    if !accelerated || !channels_per_group.is_multiple_of(lanes) {
         return Err((x, weight, bias));
     }
 
@@ -140,7 +140,7 @@ fn conv2d<E: VMulAdd + Element, T: Element>(
 
 /// Size of register blocks, we need to hardcode this because Rust and the `seq` macro don't support
 /// using associated constants as constant parameters. 8 works for all semi-modern CPUs but might
-/// not be perfectly optimized for AVX-512 capable CPUs (which probably should use 16).
+/// not be fully optimized for AVX-512 capable CPUs (which probably should use 16).
 /// This should always be conservative, since oversizing it will cause register spills and that's
 /// **much** worse than the performance lost with lower values.
 const REGISTER_BLOCK: usize = 8;

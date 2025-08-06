@@ -1,6 +1,6 @@
 # WGPU Direct Video Pipeline 🎥✨
 
-A revolutionary GPU-native video pipeline for real-time tensor visualization in Burn, enabling unprecedented insight into neural network behavior without performance penalties.
+A GPU-native video pipeline for real-time tensor visualization in Burn, enabling detailed insight into neural network behavior without performance penalties.
 
 ## 🎯 **Key Features**
 
@@ -8,9 +8,11 @@ A revolutionary GPU-native video pipeline for real-time tensor visualization in 
 - All tensor operations remain GPU-resident
 - Direct GPU buffer sharing between compute and graphics
 - No `tensor.to_data()` calls in the video pipeline
+- **NEW**: Real-time video stream processing on GPU
 
 ### **Real-time Performance**
 - 60+ FPS tensor visualization
+- **NEW**: Real-time video effects (edge detection, blur, ripples)
 - Adaptive quality scaling under load
 - Frame dropping for consistent performance
 - Triple buffering for smooth streaming
@@ -20,6 +22,7 @@ A revolutionary GPU-native video pipeline for real-time tensor visualization in 
 - Real-time normalization and value mapping
 - Support for 1D, 2D, 3D, and 4D tensors
 - Dynamic range adjustment
+- **NEW**: Live video processing with Burn tensor effects
 
 ## 🚀 **Quick Start**
 
@@ -79,7 +82,7 @@ for epoch in 0..100 {
 ## 🎨 **Visualization Modes**
 
 ### **Heat Maps**
-Perfect for weight matrices, activation maps, and gradients:
+Suitable for weight matrices, activation maps, and gradients:
 ```rust
 stream.set_colormap(ColorMap::Viridis);  // Perceptually uniform
 stream.set_colormap(ColorMap::Hot);      // Black-red-yellow-white
@@ -238,46 +241,64 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
 
 ## 📁 **Examples**
 
-### **Run Basic Example**
+### **🎬 Video Stream Processing**
+Real-time video processing with Burn tensors and GPU-native effects:
 ```bash
 cd examples/wgpu-direct-video
-cargo run --example basic_tensor_stream
+cargo run --example video_stream_processing
 ```
 
-### **Training Visualization**
+### **🔥 Single Shader Dual-Purpose Demo**
+Concept: ONE shader used for BOTH tensor computation AND visualization!
 ```bash
-cargo run --example training_visualization
+cargo run --example single_shader_dual
 ```
 
-### **Real-time Gradients**
+### **🚀 Five Tensor Dual Visualization**
+Complete training simulation with 5 Burn tensors, 2 visualized via no-CPU method:
 ```bash
-cargo run --example real_time_gradients
+cargo run --example five_tensor_dual_visualization
+```
+
+### **💫 Simple Burn Visualization**
+Regular Burn tensor operations with dual-shader visualization:
+```bash
+cargo run --example simple_burn_visualization
+```
+
+### **⚡ Super Simple Demo**
+One function call to visualize any tensor:
+```bash
+cargo run --example super_simple_demo
 ```
 
 ## 🚦 **Development Status**
 
 ### **✅ Completed**
 - [x] Core tensor-to-texture conversion
-- [x] Basic video stream management  
-- [x] Multiple colormap support
+- [x] Single shader dual-purpose concept
+- [x] Split-screen dual tensor visualization
+- [x] Five tensor training simulation example
+- [x] Multiple colormap support (Hot, Viridis)
 - [x] Performance monitoring
 - [x] Frame buffering system
+- [x] Zero-CPU visualization pipeline
 
 ### **🔄 In Progress**
-- [ ] Window surface integration
 - [ ] File export capabilities (MP4, PNG sequences)
-- [ ] Multi-tensor composition
+- [ ] Multi-tensor composition beyond dual
 - [ ] Interactive controls (zoom, pan)
+- [ ] 3D tensor slicing visualization
 
 ### **📋 Planned**
 - [ ] Network streaming
-- [ ] 3D tensor slicing
-- [ ] Volume rendering
+- [ ] Volume rendering for 3D tensors
 - [ ] Jupyter notebook integration
+- [ ] Real-time training metrics overlay
 
 ## 🤝 **Contributing**
 
-This is cutting-edge GPU visualization technology! Contributions are welcome:
+This is advanced GPU visualization technology. Contributions are welcome:
 
 1. **Core Pipeline**: Improve zero-copy tensor-texture conversion
 2. **Visualization**: Add new colormaps and rendering modes
@@ -290,4 +311,4 @@ Full API documentation is available at [docs.rs/burn-wgpu](https://docs.rs/burn-
 
 ---
 
-**Revolutionary real-time tensor visualization that stays entirely on the GPU! 🎥✨**
+**Real-time tensor visualization that stays entirely on the GPU 🎥✨**

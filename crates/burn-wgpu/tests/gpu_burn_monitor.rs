@@ -1,4 +1,4 @@
-//! GPU Burn Monitor: Real-time GPU monitoring with extreme stress testing
+//! GPU Burn Monitor: Real-time GPU monitoring with intensive stress testing
 //! 
 //! This test monitors actual GPU utilization, temperature, and memory usage
 //! while pushing the GPU to maximum load with parallel scan operations.
@@ -174,7 +174,7 @@ mod gpu_burn_monitor_tests {
         
         // Start background monitoring
         let monitoring_active = Arc::new(AtomicBool::new(true));
-        let gpu_stats = start_gpu_monitoring(monitoring_active.clone());
+        let _gpu_stats = start_gpu_monitoring(monitoring_active.clone());
         
         // Progressive burn intensity levels
         let burn_phases = vec![

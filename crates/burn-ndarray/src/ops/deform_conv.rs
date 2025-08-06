@@ -488,7 +488,7 @@ pub mod backward {
                         - F::from_elem(args.padding[1])
                         + offset[1];
                     for (i, grad_offset) in grad_offset.iter_mut().enumerate() {
-                        let is_y_direction = i % 2 == 0;
+                        let is_y_direction = i.is_multiple_of(2);
                         let use_mask = mask.is_some();
 
                         for channel in 0..channels_per_offset_group {

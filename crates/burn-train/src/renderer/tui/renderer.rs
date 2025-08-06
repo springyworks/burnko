@@ -175,8 +175,8 @@ impl TuiMetricsRenderer {
             if self.popup.is_empty() {
                 self.metrics_numeric.on_event(&event);
 
-                if let Event::Key(key) = event {
-                    if let KeyCode::Char('q') = key.code {
+                if let Event::Key(key) = event
+                    && let KeyCode::Char('q') = key.code {
                         self.popup = PopupState::Full(
                             "Quit".to_string(),
                             vec![
@@ -205,7 +205,6 @@ impl TuiMetricsRenderer {
                             ],
                         );
                     }
-                }
             }
         }
 
@@ -259,11 +258,10 @@ impl TuiMetricsRenderer {
     fn reset(&mut self) -> Result<(), Box<dyn Error>> {
         // If previous panic hook has already been re-instated, then the terminal was already reset.
         if self.previous_panic_hook.is_some() {
-            if self.persistent {
-                if let Err(err) = self.handle_post_training() {
+            if self.persistent
+                && let Err(err) = self.handle_post_training() {
                     eprintln!("Error in post-training handling: {err}");
                 }
-            }
 
             disable_raw_mode()?;
             execute!(self.terminal.backend_mut(), LeaveAlternateScreen)?;

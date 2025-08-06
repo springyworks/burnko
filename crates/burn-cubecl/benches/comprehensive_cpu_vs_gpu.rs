@@ -10,8 +10,10 @@ type CpuBackend = NdArray<f32>;
 type GpuBackend = Wgpu<f32>;
 
 /// Standard tensor sizes for benchmarking - small to large
+#[allow(dead_code)]
 const SMALL_SIZES: &[usize] = &[64, 128, 256];
 const MEDIUM_SIZES: &[usize] = &[512, 1024, 2048];  
+#[allow(dead_code)]
 const LARGE_SIZES: &[usize] = &[4096, 8192, 16384];
 
 /// Matrix sizes for intensive operations (batch_size, input_dim, output_dim)
@@ -75,7 +77,7 @@ fn bench_elementwise_ops(c: &mut Criterion) {
     group.finish();
 }
 
-/// Matrix multiplication benchmark - the ultimate GPU vs CPU test
+/// Matrix multiplication benchmark - GPU vs CPU comparison
 fn bench_matrix_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("matrix_operations");
     group.measurement_time(Duration::from_secs(15));

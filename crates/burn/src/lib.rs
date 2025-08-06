@@ -4,7 +4,7 @@
 //! # Burn
 //!
 //! Burn is a new comprehensive dynamic Deep Learning Framework built using Rust
-//! with extreme flexibility, compute efficiency and portability as its primary goals.
+//! with high flexibility, compute efficiency and portability as its primary goals.
 //!
 //! ## Performance
 //!

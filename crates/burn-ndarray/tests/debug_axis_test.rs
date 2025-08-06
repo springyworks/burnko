@@ -35,7 +35,7 @@ fn debug_axis_iteration() {
     
     // Compare with what ndarray's accumulate_axis_inplace would give us
     use ndarray::{Array2, Axis};
-    let mut ndarray_test = Array2::from_shape_vec((2, 3), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
+    let ndarray_test = Array2::from_shape_vec((2, 3), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
     println!("\nDirect ndarray accumulate_axis_inplace test:");
     let mut ndarray_axis0 = ndarray_test.clone();
     ndarray_axis0.accumulate_axis_inplace(Axis(0), |&prev, curr| *curr = *curr + prev);

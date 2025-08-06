@@ -24,7 +24,7 @@ flexibility, efficiency and portability.**
 ## Performance
 
 <div align="left">
-<img align="right" src="https://raw.githubusercontent.com/tracel-ai/burn/main/assets/ember-blazingly-fast.png" height="96px"/>
+<img align="right" src="https://raw.githubusercontent.com/tracel-ai/burn/main/assets/logo-burn-small.png" height="96px"/>
 
 Because we believe the goal of a deep learning framework is to convert computation into useful
 intelligence, we have made performance a core pillar of Burn. We strive to achieve top efficiency by
@@ -44,7 +44,7 @@ Automatic kernel fusion 💥
 
 Using Burn means having your models optimized on any backend. When possible, we provide a way to
 automatically and dynamically create custom kernels that minimize data relocation between different
-memory spaces, extremely useful when moving memory is the bottleneck.
+memory spaces, very useful when moving memory is the bottleneck.
 
 As an example, you could write your own GELU activation function with the high level tensor api (see
 Rust code snippet below).
@@ -59,7 +59,7 @@ fn gelu_custom<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
 Then, at runtime, a custom low-level kernel will be automatically created for your specific
 implementation and will rival a handcrafted GPU implementation. The kernel consists of about 60
 lines of WGSL [WebGPU Shading Language]("https://www.w3.org/TR/WGSL/https://www.w3.org/TR/WGSL/"),
-an extremely verbose lower level shader language you probably don't want to program your deep
+an verbose lower level shader language you probably don't want to program your deep
 learning models in!
 
 </details>
@@ -134,7 +134,7 @@ A good deep learning framework should ensure that models run smoothly on all har
 all hardware share the same behavior in terms of execution speed. For instance, a matrix
 multiplication kernel can be launched with many different parameters, which are highly sensitive to
 the size of the matrices and the hardware. Using the wrong configuration could reduce the speed of
-execution by a large factor (10 times or even more in extreme cases), so choosing the right kernels
+execution by a large factor (10 times or even more in some cases), so choosing the right kernels
 becomes a priority.
 
 With our home-made backends, we run benchmarks automatically and choose the best configuration for
@@ -618,7 +618,7 @@ Why use Rust for Deep Learning? 🦀
 <br />
 
 Deep Learning is a special form of software where you need very high level abstractions as well as
-extremely fast execution time. Rust is the perfect candidate for that use case since it provides
+fast execution time. Rust is a good candidate for that use case since it provides
 zero-cost abstractions to easily create neural network modules, and fine-grained control over memory
 to optimize every detail.
 

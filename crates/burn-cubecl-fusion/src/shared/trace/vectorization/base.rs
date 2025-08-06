@@ -202,7 +202,7 @@ fn vectorization_input<R: Runtime>(
 
     let inner = |s: u8| {
         // The last dimension should be a multiple of the vector size or broadcated.
-        if shape_axis % s as usize == 0 {
+        if shape_axis.is_multiple_of(s as usize) {
             return Some(Vect::Aligned(s));
         }
         None
@@ -239,7 +239,7 @@ fn vectorization_output<R: Runtime>(
 
     let inner = |s: u8| {
         // The dimension should be a multiple of the vector size.
-        if desc.shape[axis] % s as usize == 0 && s <= max {
+        if desc.shape[axis].is_multiple_of(s as usize) && s <= max {
             return Some(Vect::Aligned(s));
         }
 
@@ -295,7 +295,7 @@ fn vectorization_reshape<R: Runtime>(
     let inner = |s: u8| {
         if !multi_reads {
             // The last dimension should be a multiple of the vector size or broadcated.
-            if reshape_shape_axis % s as usize == 0 && s <= max {
+            if reshape_shape_axis.is_multiple_of(s as usize) && s <= max {
                 Some(Vect::Aligned(s))
             } else {
                 None
@@ -304,8 +304,8 @@ fn vectorization_reshape<R: Runtime>(
             // Since the original tensor must share the same vectorization factor as the
             // reshaped tensor, they must have compatible shapes when both are access
             // independently.
-            if reshape_shape_axis % s as usize == 0
-                && original_shape_axis % s as usize == 0
+            if reshape_shape_axis.is_multiple_of(s as usize)
+                && original_shape_axis.is_multiple_of(s as usize)
                 && s <= max
             {
                 Some(Vect::Aligned(s))
@@ -380,10 +380,10 @@ fn vectorization_swapped<R: Runtime>(
     let inner = |s: u8| {
         // The last dimension should be a multiple of the vector size or broadcated.
         if multi_reads {
-            if swapped_axis % s as usize == 0 && s <= max {
+            if swapped_axis.is_multiple_of(s as usize) && s <= max {
                 return Some(Vect::Aligned(s));
             }
-        } else if swapped_axis % s as usize == 0 && shape_axis % s as usize == 0 && s <= max {
+        } else if swapped_axis.is_multiple_of(s as usize) && shape_axis.is_multiple_of(s as usize) && s <= max {
             return Some(Vect::Aligned(s));
         }
         None

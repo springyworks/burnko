@@ -14,7 +14,7 @@ fn main() {
     let core_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
     
     println!("🔥🔥🔥 MAXIMUM CPU BURN TEST - NO MERCY EDITION 🔥🔥🔥");
-    println!("🧵 Detected {} logical cores - preparing for 100% UTILIZATION!", core_count);
+    println!("🧵 Detected {core_count} logical cores - preparing for 100% UTILIZATION!");
     println!("⚡ This will run MAXIMUM INTENSITY parallel scan operations for 45 seconds");
     println!("🚨 WARNING: This will max out your CPU - monitor temperature!");
     println!("🌡️  Use 'htop' or 'top' to watch all cores hit 100%!");
@@ -51,7 +51,7 @@ fn main() {
         let tensor: Tensor<NdArrayBackend, 2> = 
             Tensor::random([1, size], Distribution::Uniform(0.0, 1.0), &device);
         tensors.push(tensor);
-        println!("   ✅ Created tensor with {} elements", size);
+        println!("   ✅ Created tensor with {size} elements");
     }
     
     println!("\n🔥 STARTING INTENSIVE PARALLEL SCAN OPERATIONS! 🔥");
@@ -61,7 +61,7 @@ fn main() {
         let iter_start = Instant::now();
         
         // BRUTAL: Perform MANY more parallel scan operations simultaneously
-        for (_i, tensor) in tensors.iter().enumerate() {
+        for tensor in tensors.iter() {
             // MAXIMUM PARALLEL LOAD: 8 operations per tensor
             let t1 = tensor.clone();
             let t2 = tensor.clone();
@@ -97,7 +97,7 @@ fn main() {
             
             // Print CPU usage hint more frequently
             if iteration % 4 == 0 {
-                println!("   🌡️🌡️🌡️ ALL {} CORES SHOULD BE AT 100% UTILIZATION! 🌡️🌡️🌡️", core_count);
+                println!("   🌡️🌡️🌡️ ALL {core_count} CORES SHOULD BE AT 100% UTILIZATION! 🌡️🌡️🌡️");
             }
         }
         
@@ -107,9 +107,9 @@ fn main() {
     let total_time = start_time.elapsed();
     
     println!("\n🎯 CPU BURN TEST COMPLETED!");
-    println!("⏱️  Total duration: {:?}", total_time);
-    println!("🔄 Total iterations: {}", iteration);
-    println!("📊 Total scan operations: {}", total_operations);
+    println!("⏱️  Total duration: {total_time:?}");
+    println!("🔄 Total iterations: {iteration}");
+    println!("📊 Total scan operations: {total_operations}");
     println!("🚀 Operations per second: {:.2}", total_operations as f64 / total_time.as_secs_f64());
     
     // Final stress burst - maximum parallel load
@@ -123,18 +123,18 @@ fn main() {
     let _huge_result = huge_tensor.cumsum(1);
     let burst_duration = burst_start.elapsed();
     
-    println!("⚡ 5M element parallel cumsum completed in: {:?}", burst_duration);
+    println!("⚡ 5M element parallel cumsum completed in: {burst_duration:?}");
     
     // Cool down message
     println!("\n🌡️  CPU BURN TEST COMPLETE - Let your CPU cool down!");
-    println!("🎉 Your {} cores have been thoroughly exercised with parallel scan operations!", core_count);
-    println!("📈 Multi-core Rayon parallel scan integration: VERIFIED AND BLAZING FAST! 🔥");
+    println!("🎉 Your {core_count} cores have been thoroughly exercised with parallel scan operations!");
+    println!("📈 Multi-core Rayon parallel scan integration: VERIFIED AND WORKING! 🔥");
     
     // Performance summary
     let ops_per_core = total_operations as f64 / core_count as f64;
     println!("\n📊 PERFORMANCE SUMMARY:");
-    println!("   🧵 Cores utilized: {}", core_count);
-    println!("   ⚡ Avg operations per core: {:.2}", ops_per_core);
+    println!("   🧵 Cores utilized: {core_count}");
+    println!("   ⚡ Avg operations per core: {ops_per_core:.2}");
     println!("   🔥 Peak tensor size processed: 5,000,000 elements");
     println!("   ✅ Multi-core CPU utilization: SUCCESS!");
 }

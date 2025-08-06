@@ -258,8 +258,8 @@ impl CheckpointerBuilder {
             }
             None => {
                 n_required_map.insert(id, 1);
-                if !stop_nodes.contains(&id) {
-                    if let Some(parents) = node_tree.parents(&id) {
+                if !stop_nodes.contains(&id)
+                    && let Some(parents) = node_tree.parents(&id) {
                         for p in parents {
                             Self::update_n_required_of_parents(
                                 p,
@@ -269,7 +269,6 @@ impl CheckpointerBuilder {
                             );
                         }
                     }
-                }
             }
         }
     }

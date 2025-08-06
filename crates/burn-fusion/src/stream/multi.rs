@@ -78,14 +78,13 @@ impl<R: FusionRuntime> MultiStream<R> {
 
         let num_executed = self.enqueue_operation(id, repr, &streams, operation, handles);
 
-        if num_executed > 0 {
-            if let Some(stream) = self.streams.get_mut(&id) {
+        if num_executed > 0
+            && let Some(stream) = self.streams.get_mut(&id) {
                 let cleared = self.shared_tensors.on_executed_ops(id, stream);
                 self.clear_shared_tensors(&cleared, id);
                 let to_drop = self.shared_tensors.clear_tensors(cleared);
                 self.drop_shared_tensors(to_drop, handles, id);
             }
-        }
 
         let stream = match self.streams.get(&id) {
             Some(val) => val,
@@ -344,11 +343,10 @@ impl<R: FusionRuntime> MultiStream<R> {
     ) {
         for (stream_id, s) in self.streams.iter_mut() {
             for tensor in tensors.iter() {
-                if let Some((original, _status)) = s.queue.variables.get(&tensor.id) {
-                    if original != stream_id {
+                if let Some((original, _status)) = s.queue.variables.get(&tensor.id)
+                    && original != stream_id {
                         s.queue.variables.remove(&tensor.id);
                     }
-                }
             }
         }
         for tensor in tensors {

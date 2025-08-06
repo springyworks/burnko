@@ -1,0 +1,8 @@
+[package]
+name = "scan-verification-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+burn = { path = "../../crates/burn", features = ["ndarray"] }
+burn-ndarray = { path = "../../crates/burn-ndarray" }

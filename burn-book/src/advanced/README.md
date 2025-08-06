@@ -1,7 +1,7 @@
 # Advanced
 
 In this section, we will go into advanced topics that extend beyond basic usage. Given Burn's
-exceptional flexibility, a lot of advanced use cases become possible.
+flexibility, many advanced use cases become possible.
 
 Before going through this section, we strongly recommend exploring the
 [basic workflow](../basic-workflow/) section and the

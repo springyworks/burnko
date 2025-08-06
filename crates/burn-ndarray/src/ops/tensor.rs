@@ -611,12 +611,10 @@ impl<E: FloatNdArrayElement, I: IntNdArrayElement, Q: QuantElement> FloatTensorO
     }
 
     fn float_fft(tensor: FloatTensor<Self>, dim: usize) -> FloatTensor<Self> {
-        println!("NdArray backend float_fft called with dim: {}", dim);
         execute_with_float_dtype!(tensor, |tensor| fft_dim(tensor, dim))
     }
 
     fn float_ifft(tensor: FloatTensor<Self>, dim: usize) -> FloatTensor<Self> {
-        println!("NdArray backend float_ifft called with dim: {}", dim);
         execute_with_float_dtype!(tensor, |tensor| ifft_dim(tensor, dim))
     }
 }

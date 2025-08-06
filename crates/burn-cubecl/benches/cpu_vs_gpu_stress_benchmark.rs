@@ -2,7 +2,7 @@
 
 use burn_ndarray::{NdArray, NdArrayDevice};
 use burn_wgpu::{Wgpu, WgpuDevice};
-use burn_tensor::{Tensor, TensorData, Shape, Device as _};
+use burn_tensor::{Tensor, TensorData, Shape};
 use std::time::Instant;
 use criterion::{criterion_group, criterion_main, Criterion};
 use rayon::prelude::*;

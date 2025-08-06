@@ -1,7 +1,8 @@
 use crate::{element::FloatNdArrayElement, tensor::NdArrayTensor};
+use alloc::vec::Vec;
+use burn_common::run_par;
 use ndarray::{ArrayD, IxDyn};
 use rustfft::{FftPlanner, num_complex::Complex};
-use burn_common::run_par;
 
 /// Minimum number of elements to consider parallel FFT processing
 const FFT_PARALLEL_THRESHOLD: usize = 1024;
@@ -15,7 +16,6 @@ pub fn fft_dim<E: FloatNdArrayElement + 'static>(
     tensor: NdArrayTensor<E>,
     dim: usize,
 ) -> NdArrayTensor<E> {
-    println!("FFT: Input shape: {:?}, dim: {}", tensor.array.shape(), dim);
     
     let input_shape = tensor.array.shape();
     let axis_len = input_shape[dim];
@@ -43,14 +43,11 @@ fn fft_1d_parallel<E: FloatNdArrayElement + 'static>(
     axis_len: usize,
 ) -> NdArrayTensor<E> {
     let input_data: Vec<E> = tensor.array.iter().cloned().collect();
-    println!("FFT: Input data: {:?}", input_data);
     
     // Check if we should use parallel processing
     let use_parallel = axis_len >= FFT_PARALLEL_THRESHOLD;
     
     let complex_result = if use_parallel {
-        println!("FFT: Using parallel processing for {} elements", axis_len);
-        
         #[cfg(feature = "std")]
         {
             // Use Burn's parallel infrastructure for large FFTs
@@ -63,11 +60,8 @@ fn fft_1d_parallel<E: FloatNdArrayElement + 'static>(
             fft_1d_sequential(&input_data, axis_len)
         }
     } else {
-        println!("FFT: Using sequential processing for {} elements", axis_len);
         fft_1d_sequential(&input_data, axis_len)
     };
-    
-    println!("FFT: Complex result: {:?}", complex_result);
     
     // Create output array with shape [N, 2] for [real, imag]
     let output_shape = [axis_len, 2];
@@ -79,7 +73,6 @@ fn fft_1d_parallel<E: FloatNdArrayElement + 'static>(
         result[[i, 1]] = complex_val.im;  // Imaginary part
     }
     
-    println!("FFT: Output shape: {:?}", result.shape());
     NdArrayTensor::new(result.into_shared())
 }
 
@@ -143,7 +136,6 @@ fn fft_multidim_parallel<E: FloatNdArrayElement + 'static>(
     
     // For now, return zeros as placeholder for multi-dimensional case
     // TODO: Implement full multi-dimensional FFT with parallel processing
-    println!("FFT: Multi-dimensional FFT not yet implemented, returning zeros");
     
     let result = ArrayD::<E>::zeros(IxDyn(&output_shape));
     NdArrayTensor::new(result.into_shared())
@@ -159,7 +151,7 @@ pub fn ifft_dim<E: FloatNdArrayElement + 'static>(
     let input_shape = tensor.array.shape().to_vec(); // Clone to avoid borrow issues
     
     // Expect input to have complex format: [..., 2] where last dim is [real, imag]
-    if input_shape.len() == 0 || input_shape[input_shape.len() - 1] != 2 {
+    if input_shape.is_empty() || input_shape[input_shape.len() - 1] != 2 {
         panic!("IFFT input must have complex format with last dimension = 2");
     }
     
@@ -188,8 +180,6 @@ fn ifft_1d_parallel<E: FloatNdArrayElement + 'static>(
     let complex_data: Vec<Complex<E>> = if use_parallel {
         #[cfg(feature = "std")]
         {
-            println!("IFFT: Using parallel complex data extraction");
-            
             // Use sequential extraction for now due to borrowing constraints
             // TODO: Optimize with proper parallel extraction
             (0..axis_len).map(|i| {
@@ -240,7 +230,6 @@ fn ifft_multidim_parallel<E: FloatNdArrayElement + 'static>(
 ) -> NdArrayTensor<E> {
     // TODO: Implement parallel multi-dimensional IFFT
     // For now, return placeholder
-    println!("IFFT: Multi-dimensional IFFT not yet implemented, returning zeros");
     
     let result = ArrayD::<E>::zeros(IxDyn(output_shape));
     NdArrayTensor::new(result.into_shared())

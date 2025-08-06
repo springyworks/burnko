@@ -313,11 +313,10 @@ where
         O::Record: 'static,
         S::Record<B>: 'static,
     {
-        if self.tracing_logger.is_some() {
-            if let Err(e) = self.tracing_logger.as_ref().unwrap().install() {
+        if self.tracing_logger.is_some()
+            && let Err(e) = self.tracing_logger.as_ref().unwrap().install() {
                 log::warn!("Failed to install the experiment logger: {e}");
             }
-        }
         let renderer = self
             .renderer
             .unwrap_or_else(|| default_renderer(self.interrupter.clone(), self.checkpoint));

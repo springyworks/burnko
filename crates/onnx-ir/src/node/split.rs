@@ -86,7 +86,7 @@ pub fn split_config(node: &Node) -> SplitConfig {
 
         // Calculate the split size considering any remainder for non-evenly divisible dimensions
         let calculated_split_size =
-            dim_size / (num_outputs - (dim_size % num_outputs != 0) as usize);
+            dim_size / (num_outputs - !dim_size.is_multiple_of(num_outputs) as usize);
 
         if calculated_split_size == 0 {
             panic!(
@@ -135,7 +135,7 @@ pub fn split_config(node: &Node) -> SplitConfig {
 
         // Calculate inferred split size based on number of outputs
         let calculated_split_size =
-            dim_size / (num_outputs - (dim_size % num_outputs != 0) as usize);
+            dim_size / (num_outputs - !dim_size.is_multiple_of(num_outputs) as usize);
 
         if calculated_split_size == 0 {
             panic!(

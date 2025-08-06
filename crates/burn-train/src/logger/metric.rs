@@ -69,11 +69,10 @@ impl FileMetricLogger {
 
                 let epoch = dir_name.replace(EPOCH_PREFIX, "").parse::<usize>().ok();
 
-                if let Some(epoch) = epoch {
-                    if epoch > max_epoch {
+                if let Some(epoch) = epoch
+                    && epoch > max_epoch {
                         max_epoch = epoch;
                     }
-                }
             }
         }
 

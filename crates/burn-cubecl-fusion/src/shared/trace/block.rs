@@ -328,8 +328,8 @@ impl FuseBlockBuilder {
         //
         // Only local variables can become outputs.
         let mark = |var: &Arg, list: &mut Vec<(TensorId, FusePrecision)>| {
-            if let Arg::Local(index, precision) = var {
-                if let Some(tensor_id) = self.locals.find_tensor_id(*precision, *index) {
+            if let Arg::Local(index, precision) = var
+                && let Some(tensor_id) = self.locals.find_tensor_id(*precision, *index) {
                     // Input and outputs tensors are using bool_precision for booleans.
                     let precision = match precision {
                         FusePrecision::Bool => self.bool_precision,
@@ -341,7 +341,6 @@ impl FuseBlockBuilder {
                         list.push(entry);
                     }
                 }
-            }
         };
 
         let mark_binary = |op: &BinaryFuseArgs,
@@ -531,11 +530,10 @@ impl FuseBlockBuilder {
         // All tensors where their latest representation is read only should be written to since they
         // are going to be used after the fused kernel by other operations.
         for (tensor, precision) in self.outputs.iter() {
-            if let TensorStatus::ReadOnly = tensor.status {
-                if !resources.dropped.contains(&tensor.id) {
+            if let TensorStatus::ReadOnly = tensor.status
+                && !resources.dropped.contains(&tensor.id) {
                     result.insert(*precision, tensor.clone());
                 }
-            }
         }
 
         result
@@ -549,11 +547,10 @@ struct LocalVariablePool {
 
 impl LocalVariablePool {
     fn get(&self, precision: FusePrecision, tensor_id: TensorId) -> Option<Arg> {
-        if let Some(indexes) = self.values.get(&precision) {
-            if let Some(index) = indexes.get(&tensor_id) {
+        if let Some(indexes) = self.values.get(&precision)
+            && let Some(index) = indexes.get(&tensor_id) {
                 return Some(Arg::Local(*index, precision));
             }
-        }
 
         None
     }

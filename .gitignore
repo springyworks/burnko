@@ -16,3 +16,6 @@ out
 # Virtual Environment of Python
 .venv
 uv.lock
+
+# Root level .rs files should not exist (use examples/ structure instead)
+/*.rs

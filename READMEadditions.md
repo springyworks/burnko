@@ -3,14 +3,15 @@
 ## 🎯 **ESSENTIAL DEVELOPMENT WORKFLOW** 
 
 ### **Cargo `-p` Package Targeting** 🔧
-**CRITICAL**: Always use `-p <package_name>` option when running cargo commands in Burn workspace!
+**Important**: Always use `-p <package_name>` option when running cargo commands in Burn workspace!
 
-**The `-p` cargo argument has been essential for focused testing and development.**
+**The `-p` cargo argument has bee#### **3. The 1M Element GPU Performance Issue** 💥
+**At 1M elements, GPU is 16.30x slower than CPU**:essential for focused testing and development.**
 
 #### **Why This Matters**:
 - Burn is a **massive workspace** with 50+ crates
 - Running `cargo test` without `-p` tries to build/test EVERYTHING
-- Results in extremely long build times and potential conflicts
+- Results in very long build times and potential conflicts
 
 #### **Usage Examples**:
 ```bash
@@ -164,7 +165,7 @@ From scan implementation analysis:
 ## **Development Configuration** 🔧
 
 ### **Rust Edition Consistency** 
-**Critical**: Burn framework uses **Rust Edition 2024**, not 2021!
+**Important**: Burn framework uses **Rust Edition 2024**, not 2021!
 ```toml
 [workspace.package]
 edition = "2024"  # <-- Burn standard
@@ -194,7 +195,7 @@ Always use `-p` package targeting for focused development:
 - 🔜 **Then: GPU implementation** - CubeCL FFT kernels
 - 🔜 **Finally: Performance benchmarking** - CPU vs GPU analysis
 
-**🏆 Key Takeaway**: The disciplined warning-driven approach that fixed scan operations provides a proven framework for implementing any complex operation in Burn, ensuring we avoid "sequential disasters" and dummy implementations.
+**🏆 Key Takeaway**: The disciplined warning-driven approach that fixed scan operations provides a proven framework for implementing any complex operation in Burn, ensuring we avoid "sequential issues" and dummy implementations.
 
 ---
 
@@ -203,7 +204,7 @@ Always use `-p` package targeting for focused development:
 ### **Why This Matters**:
 - Burn is a **massive workspace** with 50+ crates
 - Running `cargo test` without `-p` tries to build/test EVERYTHING
-- Results in extremely long build times and potential conflicts
+- Results in very long build times and potential conflicts
 
 ### **Usage Examples**:
 ```bash
@@ -224,18 +225,18 @@ cargo run   # Ambiguous package!
 - **Better error messages**: Focused on specific package issues
 
 ### **Discovery Context**:
-This became critical when creating standalone heavy lifting tests - workspace configuration errors were resolved by proper `-p` usage and workspace exclusion.
+This became important when creating standalone heavy lifting tests - workspace configuration errors were resolved by proper `-p` usage and workspace exclusion.
 
 ---
 
 ---
 
-# 🏁 **ULTIMATE CPU vs GPU HEAVY LIFTING RESULTS** - FINAL VERDICT!
+# 🏁 **CPU vs GPU Heavy Lifting Results** - Analysis Summary
 
-## **The SHOCKING Showdown Results** �
-**After pushing to 20 MILLION elements (80MB), CPU STILL DOMINATES GPU by 3.79x!**
+## **Performance Comparison Results** 
+**Testing with up to 20 million elements (80MB) shows CPU maintains 3.79x performance advantage**
 
-### **MEGA Performance Summary** (August 4, 2025):
+### **Performance Summary** (August 4, 2025):
 ```
 Elements    | CPU Speed   | GPU Speed  | CPU Advantage | Data Size
 1M          | 42.57 M/s   | 2.61 M/s   | 16.30x faster | 4MB
@@ -247,48 +248,48 @@ Elements    | CPU Speed   | GPU Speed  | CPU Advantage | Data Size
 20M         | 43.56 M/s   | 11.49 M/s  | 3.79x faster  | 80MB 🚀
 ```
 
-### **MIND-BLOWING Discoveries** �
+### **Analysis Findings**
 
 #### **1. GPU Performance Plateau** 📈➡️
-**CRITICAL FINDING**: GPU performance **plateaus around 11-12 Melems/sec** after 2M elements!
+**Key Finding**: GPU performance plateaus around 11-12 Melems/sec after 2M elements
 - **2M elements**: 13.25 Melems/sec (peak GPU performance)
 - **5M-20M elements**: Stuck at ~11.3 Melems/sec (NO improvement!)
 - **Implication**: GPU is hitting some fundamental bottleneck (memory bandwidth? kernel efficiency?)
 
-#### **2. CPU Consistency Champions** 🏆
-**CPU maintains rock-solid 43-48 Melems/sec across ALL sizes**:
+#### **2. CPU Consistency** 🏆
+**CPU maintains consistent 43-48 Melems/sec across all test sizes**:
 - **Peak CPU**: 47.83 Melems/sec at 2M elements
 - **Stability**: ±10% variance across 1M-20M range
-- **Architecture**: Excellent scaling with multicore + memory bandwidth
+- **Architecture**: Good scaling with multicore + memory bandwidth
 
-#### **3. The 1M Element GPU Disaster** 💥
+#### **3. The 1M Element GPU Performance Issue** 💥
 **At 1M elements, GPU is 16.30x SLOWER than CPU!**
-- **GPU creation**: 286ms (absolutely terrible setup overhead)
+- **GPU creation**: 286ms (significant setup overhead)
 - **CPU total**: 23.5ms vs GPU total: 383ms
-- **Root cause**: GPU driver/initialization penalty kills small-medium workloads
+- **Root cause**: GPU driver/initialization penalty affects small-medium workloads
 
 #### **4. Memory Transfer Analysis** 🔄
 **GPU memory transfer times scale linearly but dominate performance**:
 - **10M elements**: GPU retrieval 81ms vs CPU retrieval 205ms
 - **20M elements**: GPU retrieval 157ms vs CPU retrieval 410ms
-- **Surprising**: GPU memory transfers are actually FASTER than CPU at large sizes!
+- **Note**: GPU memory transfers are actually faster than CPU at large sizes
 
 ### **Detailed Performance Breakdown** 📊
 
-#### **CPU Architecture Excellence**:
-- **Creation**: Lightning fast (1.7-36ms even for 20M elements)
-- **Computation**: Blazing (0.95-13ms across all sizes) 
+#### **CPU Architecture Performance**:
+- **Creation**: Fast (1.7-36ms even for 20M elements)
+- **Computation**: Fast (0.95-13ms across all sizes) 
 - **Retrieval**: Main bottleneck but scales predictably (21-410ms)
-- **Sweet spot**: Excellent balance of all three phases
+- **Sweet spot**: Good balance of all three phases
 
-#### **GPU Architecture Reality**:
-- **Creation**: Terrible at small sizes (287ms), improves to reasonable (71ms at 20M)  
+#### **GPU Architecture Performance**:
+- **Creation**: Slow at small sizes (287ms), improves to reasonable (71ms at 20M)  
 - **Computation**: Scales predictably but slowly (92ms → 1513ms for 20x data)
-- **Retrieval**: Actually EXCELLENT (faster than CPU at large sizes!)
-- **Bottleneck**: Compute phase is the killer - limited parallel efficiency
+- **Retrieval**: Actually good (faster than CPU at large sizes)
+- **Bottleneck**: Compute phase is the limiting factor - limited parallel efficiency
 
-### **The Crossover Point Mystery** 🔍
-**PREDICTION SHATTERED**: Even at 20M elements, no GPU crossover found!
+### **The Crossover Point Analysis** 🔍
+**Analysis Result**: Even at 20M elements, no GPU crossover found
 
 #### **Extrapolation Analysis**:
 - **GPU trend**: Performance plateaus at ~11 Melems/sec (NOT improving!)
@@ -297,7 +298,7 @@ Elements    | CPU Speed   | GPU Speed  | CPU Advantage | Data Size
 - **Alternative hypothesis**: GPU advantage requires 100M+ elements OR different operation types
 
 #### **Fundamental Architecture Insight** 🧠
-**Why CPU Dominates**:
+**Why CPU Performs Better**:
 1. **Memory bandwidth**: CPU has superior memory subsystem for sequential operations
 2. **Parallel efficiency**: Cumsum is inherently sequential - limited GPU parallelism benefit
 3. **Setup overhead**: GPU kernel launch costs never amortized even at 20M elements
@@ -321,7 +322,7 @@ Elements    | CPU Speed   | GPU Speed  | CPU Advantage | Data Size
 - **Memory bandwidth** matters more than raw compute power for this operation
 - **Parallel algorithms** don't always benefit from parallel hardware
 
-**🏆 FINAL VERDICT**: CPU multicore with Burn framework delivers **3.79x superior performance** even at massive 20M element scale. GPU advantage for cumsum operations appears to be a **complete myth** in this architecture!
+**🏆 Analysis Conclusion**: CPU multicore with Burn framework delivers **3.79x better performance** even at massive 20M element scale. GPU advantage for cumsum operations appears to be limited in this architecture.
 
 ---
 

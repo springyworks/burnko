@@ -12,10 +12,13 @@ members = [
     "crates/burn-collective/multinode-tests",
     "examples/*",
     "xtask",
+    "devutils/nvidia-smi-rusti",
 ]
 
 exclude = [
     "examples/notebook",
+    "examples/manual",
+    "examples/raspberry-pi-pico",
     "heavy_lifting_test",
 ]
 

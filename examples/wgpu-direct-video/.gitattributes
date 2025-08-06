@@ -1,0 +1,3 @@
+# Prevent restoration of deleted directories/files
+burn-wgpu-dual/ merge=ours
+burn-wgpu-dual/** merge=ours

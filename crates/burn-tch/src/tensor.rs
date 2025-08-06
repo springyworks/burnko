@@ -227,18 +227,16 @@ impl TchTensor {
         let num_elements_out = out_shape.num_elements();
 
         // Attempt to mutate lhs tensor
-        if lhs_shape.num_elements() == num_elements_out {
-            if let Some(output) = lhs.mut_ops(|lhs| flmut(lhs, &rhs.tensor)) {
+        if lhs_shape.num_elements() == num_elements_out
+            && let Some(output) = lhs.mut_ops(|lhs| flmut(lhs, &rhs.tensor)) {
                 return output;
             }
-        }
 
         // Attempt to mutate rhs tensor
-        if rhs_shape.num_elements() == num_elements_out {
-            if let Some(output) = rhs.mut_ops(|rhs| frmut(&lhs.tensor, rhs)) {
+        if rhs_shape.num_elements() == num_elements_out
+            && let Some(output) = rhs.mut_ops(|rhs| frmut(&lhs.tensor, rhs)) {
                 return output;
             }
-        }
 
         let storage = lhs.storage;
         let tensor = fref(&lhs.tensor, &rhs.tensor);

@@ -58,7 +58,7 @@ pub fn nchw_to_nhwc<R: CubeRuntime, E: CubeElement>(input: CubeTensor<R>) -> Cub
     let out_vec = R::supported_line_sizes()
         .iter()
         .copied()
-        .find(|vec| in_c % *vec as usize == 0)
+        .find(|vec| in_c.is_multiple_of(*vec as usize))
         .unwrap_or(1);
 
     unsafe {

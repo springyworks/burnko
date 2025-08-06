@@ -55,9 +55,14 @@ wgpu = { version = "0.19", optional = true }
 burn-cubecl = { path = "../burn-cubecl", version = "0.19.0", default-features = false, features = [
     "export_tests",
 ] }
+criterion = { version = "0.5", features = ["html_reports"] }
 half = { workspace = true }
 paste = { workspace = true }
 
 [package.metadata.docs.rs]
 features = ["default"]
 rustdoc-args = ["--cfg", "docsrs"]
+
+[[bench]]
+name = "scan_gpu_stress_benchmark"
+harness = false

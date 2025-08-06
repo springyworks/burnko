@@ -232,11 +232,9 @@ impl<O> Policy<O> {
                     matching,
                     progress: _,
                 } = trigger
-                {
-                    if let ValidatorState::Validating = matching.state {
+                    && let ValidatorState::Validating = matching.state {
                         return Action::Defer;
                     }
-                }
             }
         }
 

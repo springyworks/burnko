@@ -27,7 +27,7 @@ fn main() {
         7_500_000,   // 7.5M - intermediate heavy
         10_000_000,  // 10M - THE BIG TEST! Where GPU should finally shine
         15_000_000,  // 15M - if GPU wins at 10M, push further
-        20_000_000,  // 20M - ultimate GPU showcase
+        20_000_000,  // 20M - large GPU test
     ];
     
     for &size in &test_sizes {

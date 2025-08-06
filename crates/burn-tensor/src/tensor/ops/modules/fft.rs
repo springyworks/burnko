@@ -71,19 +71,24 @@ pub fn ifft_with_slice_assign<B: Backend, K: TensorKind<B> + BasicOps<B>>(
 /// Complex number representation for FFT operations
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Complex {
+    /// Real component of the complex number
     pub real: f32,
+    /// Imaginary component of the complex number  
     pub imag: f32,
 }
 
 impl Complex {
+    /// Create a new complex number with given real and imaginary parts
     pub fn new(real: f32, imag: f32) -> Self {
         Self { real, imag }
     }
 
+    /// Create a complex number representing zero
     pub fn zero() -> Self {
         Self::new(0.0, 0.0)
     }
 
+    /// Create a complex number from a real number (imaginary part is zero)
     pub fn from_real(real: f32) -> Self {
         Self::new(real, 0.0)
     }
@@ -98,10 +103,10 @@ pub fn dft_cpu_1d(input: &[f32], forward: bool) -> Vec<Complex> {
     
     for k in 0..n {
         let mut sum = Complex::zero();
-        for j in 0..n {
+        for (j, &input_val) in input.iter().enumerate().take(n) {
             let angle = if forward { -2.0 } else { 2.0 } * PI * (k * j) as f32 / n as f32;
             let twiddle = Complex::new(angle.cos(), angle.sin());
-            let input_complex = Complex::from_real(input[j]);
+            let input_complex = Complex::from_real(input_val);
             sum.real += input_complex.real * twiddle.real - input_complex.imag * twiddle.imag;
             sum.imag += input_complex.real * twiddle.imag + input_complex.imag * twiddle.real;
         }

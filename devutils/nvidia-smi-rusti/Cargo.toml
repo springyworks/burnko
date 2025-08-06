@@ -1,0 +1,9 @@
+[package]
+name = "nvidia-smi-rusti"
+version = "0.1.0"
+edition = "2021"
+description = "Utility for monitoring and debugging Burn (Rust) processes on NVIDIA GPUs using nvidia-smi."
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+regex = "1"

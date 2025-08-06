@@ -100,6 +100,7 @@ pub fn load_test_image<B: Backend>(name: &str, device: &B::Device, luma: bool) -
     }
 }
 
+#[allow(dead_code)]
 fn create_test_images() {
     let grayscale_image = ImageBuffer::<Luma<u8>, _>::from_fn(256, 256, |x, y| {
         let intensity = ((x + y) % 256) as u8;
@@ -119,7 +120,6 @@ fn create_test_images() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn_tensor::backend::Backend;
     use burn_ndarray::NdArrayDevice;
     use burn_ndarray::NdArray;
 

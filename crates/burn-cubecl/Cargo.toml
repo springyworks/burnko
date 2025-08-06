@@ -110,7 +110,7 @@ name = "cpu_vs_gpu_stress_benchmark"
 harness = false
 
 [[bench]]
-name = "ultimate_cpu_vs_gpu"
+name = "cpu_vs_gpu_comparison"
 harness = false
 
 [[bench]]

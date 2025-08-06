@@ -1,3 +1,4 @@
+#[cfg(feature = "std")]
 use crate::ops::scan_parallel::{cumsum_dim_parallel, cumprod_dim_parallel};
 use crate::{element::NdArrayElement, tensor::NdArrayTensor};
 use burn_tensor::ElementConversion;

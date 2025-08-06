@@ -95,7 +95,7 @@ fn heavy_cpu_vs_gpu_battle(c: &mut Criterion) {
 }
 
 /// Test 2D and 3D tensors to see if GPU wins on multi-dimensional data
-fn multidimensional_heavy_battle(c: &mut Criterion) {
+fn multidimensional_heavy_battle(_c: &mut Criterion) {
     let cpu_device = Default::default();
     let gpu_device = Default::default();
     

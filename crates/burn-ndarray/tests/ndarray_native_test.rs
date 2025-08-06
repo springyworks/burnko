@@ -8,7 +8,7 @@ fn test_ndarray_accumulate_performance() {
     println!("=== Testing ndarray's accumulate_axis_inplace ===");
     
     // Test 1: Correctness on small array
-    let mut small_array = Array2::from_shape_vec((2, 3), vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
+    let small_array = Array2::from_shape_vec((2, 3), vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
     println!("Original: {:?}", small_array);
     
     let mut test_axis0 = small_array.clone();
@@ -47,10 +47,10 @@ fn test_ndarray_accumulate_performance() {
     
     // Test 3: Check if ndarray has parallel features enabled
     println!("\n=== Feature Detection ===");
-    #[cfg(feature = "rayon")]
-    println!("Rayon feature is enabled!");
-    #[cfg(not(feature = "rayon"))]
-    println!("Rayon feature is NOT enabled");
+    #[cfg(feature = "std")]
+    println!("Std feature is enabled - parallel operations available!");
+    #[cfg(not(feature = "std"))]
+    println!("Std feature is NOT enabled - sequential operations only");
 }
 
 #[test]

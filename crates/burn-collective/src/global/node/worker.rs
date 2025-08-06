@@ -150,12 +150,11 @@ impl<C: ProtocolClient> GlobalClientWorker<C> {
     ) -> Option<C::Channel> {
         let mut retries = 0;
         loop {
-            if let Some(max) = retry_max {
-                if retries >= max {
+            if let Some(max) = retry_max
+                && retries >= max {
                     log::warn!("Failed to connect to {address} after {max} retries.");
                     return None;
                 }
-            }
 
             // Try to connect to the request address.
             println!("Connecting to {address} ...");

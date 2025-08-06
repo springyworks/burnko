@@ -142,7 +142,7 @@ mod extreme_gpu_burn_tests {
         duration_ms: u64,
         num_threads: usize,
     ) -> Vec<(f32, f32, f32)> {
-        let start_time = Instant::now();
+        let _start_time = Instant::now();
         let gpu_stats = Arc::new(Mutex::new(Vec::new()));
         let stats_clone = gpu_stats.clone();
         
@@ -273,7 +273,7 @@ mod extreme_gpu_burn_tests {
                 
                 // Achievement feedback
                 if phase_max_util > 90.0 {
-                    println!("   🏆 INCREDIBLE: >90% GPU utilization achieved!");
+                    println!("   🏆 GOOD: >90% GPU utilization achieved!");
                 } else if phase_max_util > 75.0 {
                     println!("   🎯 SUCCESS: >75% GPU utilization achieved!");
                 } else if phase_max_util > 50.0 {

@@ -147,8 +147,8 @@ impl<B: Backend> BinaryCrossEntropyLoss<B> {
             "Shape of targets ({targets_dims:?}) should correspond to outer shape of logits ({logits_dims:?})."
         );
 
-        if let Some(weights) = &self.weights {
-            if D > 1 {
+        if let Some(weights) = &self.weights
+            && D > 1 {
                 let targets_classes = targets_dims[D - 1];
                 let weights_classes = weights.dims()[0];
                 assert!(
@@ -156,7 +156,6 @@ impl<B: Backend> BinaryCrossEntropyLoss<B> {
                     "The number of classes ({weights_classes}) does not match the weights provided ({targets_classes})."
                 );
             }
-        }
     }
 }
 

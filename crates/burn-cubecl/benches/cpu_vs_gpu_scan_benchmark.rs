@@ -1,6 +1,6 @@
-use burn_ndarray::NdArray;
+use burn_ndarray::{NdArray, NdArrayDevice};
 use burn_wgpu::{Wgpu, WgpuDevice};
-use burn_tensor::{Tensor, TensorData, Shape, Device};
+use burn_tensor::{Tensor, TensorData, Shape};
 use std::time::Instant;
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 
@@ -51,7 +51,7 @@ fn bench_cpu_vs_gpu_direct(c: &mut Criterion) {
     ];
     
     let gpu_device = WgpuDevice::default();
-    let cpu_device = Device::Cpu;
+    let cpu_device = NdArrayDevice::Cpu;
     
     for (name, size) in sizes {
         // CPU Benchmark
@@ -78,7 +78,7 @@ fn bench_cpu_vs_gpu_direct(c: &mut Criterion) {
                 let gb_per_sec = (size * std::mem::size_of::<f32>()) as f64 / duration.as_secs_f64() / 1e9;
                 println!("   Throughput: {:.0} elements/sec, {:.2} GB/s", elements_per_sec, gb_per_sec);
                 
-                result
+                duration // Return duration instead of result
             });
         });
         
@@ -124,7 +124,7 @@ fn bench_cpu_vs_gpu_direct(c: &mut Criterion) {
                 let gb_per_sec = (size * std::mem::size_of::<f32>()) as f64 / total_time.as_secs_f64() / 1e9;
                 println!("   Throughput: {:.0} elements/sec, {:.2} GB/s", elements_per_sec, gb_per_sec);
                 
-                result
+                total_time // Return total_time instead of result
             });
         });
     }
@@ -138,7 +138,7 @@ fn bench_breakeven_analysis(c: &mut Criterion) {
     group.sample_size(20);
     
     let gpu_device = WgpuDevice::default();
-    let cpu_device = Device::Cpu;
+    let cpu_device = NdArrayDevice::Cpu;
     
     // Test various sizes to find GPU advantage point
     let test_sizes = vec![
@@ -191,7 +191,7 @@ fn bench_breakeven_analysis(c: &mut Criterion) {
                 println!("   GPU: {:?}", gpu_time);
                 println!("   Winner: {} (speedup: {:.2}x)", winner, speedup.abs());
                 
-                (cpu_result, gpu_result)
+                speedup // Return speedup instead of tensors
             });
         });
     }
@@ -205,7 +205,7 @@ fn bench_operation_characteristics(c: &mut Criterion) {
     group.sample_size(10);
     
     let gpu_device = WgpuDevice::default();
-    let cpu_device = Device::Cpu;
+    let cpu_device = NdArrayDevice::Cpu;
     let size = HUNDRED_MEGA; // 100M elements for detailed analysis
     
     group.bench_function("cumsum_analysis", |b| {
@@ -274,7 +274,7 @@ fn bench_operation_characteristics(c: &mut Criterion) {
                 println!("⚡ Bottleneck: GPU compute");
             }
             
-            (cpu_result, gpu_result)
+            gpu_compute_time // Return timing instead of tensors
         });
     });
     
