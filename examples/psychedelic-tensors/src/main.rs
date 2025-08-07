@@ -9,18 +9,20 @@
 //! - ↑↓: Animation speed, ←→: Intensity
 //! - Space: Print status, Esc: Exit
 
+use burn::backend::ndarray::NdArray;
+use burn::tensor::Tensor;
+use burn::tensor::TensorData;
 use minifb::{Key, Window, WindowOptions};
 use std::time::{Duration, Instant};
-
-// Simplified without actual tensor operations for now - focusing on pure 2D visualization
 
 // Window constants for multi-tensor grid
 const WINDOW_WIDTH: usize = 1200;
 const WINDOW_HEIGHT: usize = 800;
 const GRID_COLS: usize = 3;
 const GRID_ROWS: usize = 2;
-const CELL_WIDTH: usize = WINDOW_WIDTH / GRID_COLS;
-const CELL_HEIGHT: usize = WINDOW_HEIGHT / GRID_ROWS;
+const CELL_MARGIN: usize = 8;
+const CELL_WIDTH: usize = (WINDOW_WIDTH - (GRID_COLS + 1) * CELL_MARGIN) / GRID_COLS;
+const CELL_HEIGHT: usize = (WINDOW_HEIGHT - (GRID_ROWS + 1) * CELL_MARGIN) / GRID_ROWS;
 const TENSOR_SIZE: usize = 64; // 64x64 tensors for each visualization
 
 #[derive(Clone, Copy, Debug)]
@@ -78,11 +80,11 @@ struct PsychedelicVisualizer {
     window: Window,
     buffer: Vec<u32>,
     time: f32,
-    current_operation: TensorOperation,
     animation_speed: f32,
     intensity_multiplier: f32,
     color_phase: f32,
     last_frame_time: Instant,
+    tensors: Vec<burn::tensor::Tensor<burn::backend::wgpu::Wgpu<f32>, 2>>,
 }
 
 impl PsychedelicVisualizer {
@@ -93,18 +95,27 @@ impl PsychedelicVisualizer {
             WINDOW_HEIGHT,
             WindowOptions::default(),
         ).expect("Failed to create window");
-        
         window.limit_update_rate(Some(Duration::from_millis(16))); // ~60 FPS
-        
+
+        // Use wgpu backend for all tensors
+        use burn::backend::wgpu::Wgpu;
+        use burn::tensor::Distribution;
+        let device = burn::backend::wgpu::WgpuDevice::default();
+        let mut tensors = Vec::new();
+        let mut t = burn::tensor::Tensor::<Wgpu<f32>, 2>::random([TENSOR_SIZE, TENSOR_SIZE], Distribution::Default, &device);
+        for _ in 0..6 {
+            tensors.push(t.clone());
+        }
+
         Self {
             window,
             buffer: vec![0; WINDOW_WIDTH * WINDOW_HEIGHT],
             time: 0.0,
-            current_operation: TensorOperation::Sum,
             animation_speed: 1.0,
             intensity_multiplier: 1.0,
             color_phase: 0.0,
             last_frame_time: Instant::now(),
+            tensors,
         }
     }
     
@@ -120,28 +131,7 @@ impl PsychedelicVisualizer {
     }
     
     fn handle_input(&mut self) {
-        // Operation controls
-        if self.window.is_key_pressed(Key::S, minifb::KeyRepeat::No) {
-            self.current_operation = TensorOperation::Sum;
-            println!("🔄 Operation: {}", self.current_operation.name());
-        }
-        if self.window.is_key_pressed(Key::M, minifb::KeyRepeat::No) {
-            self.current_operation = TensorOperation::Max;
-            println!("🔄 Operation: {}", self.current_operation.name());
-        }
-        if self.window.is_key_pressed(Key::N, minifb::KeyRepeat::No) {
-            self.current_operation = TensorOperation::Min;
-            println!("🔄 Operation: {}", self.current_operation.name());
-        }
-        if self.window.is_key_pressed(Key::E, minifb::KeyRepeat::No) {
-            self.current_operation = TensorOperation::Mean;
-            println!("🔄 Operation: {}", self.current_operation.name());
-        }
-        
-        // Backend toggle
-        // (Removed for simplified version - pure math visualization)
-        
-        // Animation controls
+    // Animation controls
         if self.window.is_key_down(Key::Up) {
             self.animation_speed = (self.animation_speed * 1.05).min(5.0);
         }
@@ -155,13 +145,12 @@ impl PsychedelicVisualizer {
             self.intensity_multiplier = (self.intensity_multiplier * 1.02).min(3.0);
         }
         
-        // Status
-        if self.window.is_key_pressed(Key::Space, minifb::KeyRepeat::No) {
-            println!("Status: Op={}, Speed={:.2}, Intensity={:.2}", 
-                    self.current_operation.name(),
-                    self.animation_speed,
-                    self.intensity_multiplier);
-        }
+    // Status
+    if self.window.is_key_pressed(Key::Space, minifb::KeyRepeat::No) {
+        println!("Status: Speed={:.2}, Intensity={:.2}", 
+            self.animation_speed,
+            self.intensity_multiplier);
+    }
     }
     
     fn update_animation(&mut self) {
@@ -176,164 +165,68 @@ impl PsychedelicVisualizer {
     fn render_multi_tensors(&mut self) {
         // Clear buffer
         self.buffer.fill(0);
-        
-        // Generate all 6 visualization modes simultaneously in a grid
-        let modes = [
-            VisualizationMode::PsychedelicWaves,
-            VisualizationMode::CosmicSpiral, 
-            VisualizationMode::TensorStorm,
-            VisualizationMode::PlasmaField,
-            VisualizationMode::QuantumRipples,
-            VisualizationMode::HypnoticMandalas,
-        ];
-        
-        for (mode_idx, &mode) in modes.iter().enumerate() {
-            let grid_x = mode_idx % GRID_COLS;
-            let grid_y = mode_idx / GRID_COLS;
-            
-            // Generate 2D tensor for this mode
-            let tensor = self.generate_2d_tensor(mode);
-            
-            // Render this tensor into the appropriate grid cell
-            self.render_tensor_to_cell(&tensor, grid_x, grid_y);
+
+        // Pipeline: each tensor is the output of the previous, last feeds into first
+        // Compute new tensors with different ops and feedback loop
+        use burn::tensor::Tensor;
+        use burn::tensor::backend::Backend;
+        use burn::backend::wgpu::Wgpu;
+        let device = burn::backend::wgpu::WgpuDevice::default();
+        let mut new_tensors = Vec::with_capacity(6);
+        for i in 0..6 {
+            let input = if i == 0 {
+                self.tensors[5].clone()
+            } else {
+                self.tensors[i - 1].clone()
+            };
+            let t = match i {
+                0 => input.abs(),
+                1 => input * 0.8 + 0.2,
+                2 => input.clamp_min(0.2).clamp_max(0.8),
+                3 => input * -1.0 + 1.0, // invert
+                4 => input + Tensor::<Wgpu<f32>, 2>::random([TENSOR_SIZE, TENSOR_SIZE], burn::tensor::Distribution::Default, &device) * 0.1,
+                5 => input * (self.time.sin() as f32 + 1.1),
+                _ => input,
+            };
+            new_tensors.push(t);
         }
-        
+        self.tensors = new_tensors;
+
+        // Collect tensor data first to avoid borrow checker issues
+        let tensor_datas: Vec<Vec<f32>> = self.tensors.iter()
+            .map(|t| t.to_data().as_slice().expect("to_data failed").to_vec())
+            .collect();
+        // Render using only the buffer and collected data
+        for i in 0..6 {
+            let grid_x = i % GRID_COLS;
+            let grid_y = i / GRID_COLS;
+            self.render_tensor_data_to_cell(&tensor_datas[i], grid_x, grid_y);
+        }
+
         // Update window
         self.window.update_with_buffer(&self.buffer, WINDOW_WIDTH, WINDOW_HEIGHT)
             .expect("Failed to update window");
     }
     
-    fn generate_2d_tensor(&self, mode: VisualizationMode) -> Vec<Vec<f32>> {
-        let mut tensor = vec![vec![0.0; TENSOR_SIZE]; TENSOR_SIZE];
-        
-        match mode {
-            VisualizationMode::PsychedelicWaves => {
-                // 2D Neural oscillations across cortex
-                for y in 0..TENSOR_SIZE {
-                    for x in 0..TENSOR_SIZE {
-                        let x_norm = x as f32 / TENSOR_SIZE as f32;
-                        let y_norm = y as f32 / TENSOR_SIZE as f32;
-                        let wave1 = (x_norm * 10.0 + y_norm * 8.0 + self.time * 3.0).sin();
-                        let wave2 = (x_norm * 15.0 - y_norm * 12.0 - self.time * 2.0).cos();
-                        let wave3 = ((x_norm - 0.5).powi(2) + (y_norm - 0.5).powi(2)).sqrt() * 20.0 + self.time * 1.5;
-                        tensor[y][x] = wave1 + wave2 * 0.7 + wave3.sin() * 0.4;
-                    }
-                }
-            }
-            
-            VisualizationMode::CosmicSpiral => {
-                // Spiral patterns - like galaxy arms or neural pathways
-                for y in 0..TENSOR_SIZE {
-                    for x in 0..TENSOR_SIZE {
-                        let x_center = x as f32 / TENSOR_SIZE as f32 - 0.5;
-                        let y_center = y as f32 / TENSOR_SIZE as f32 - 0.5;
-                        let radius = (x_center.powi(2) + y_center.powi(2)).sqrt();
-                        let angle = y_center.atan2(x_center);
-                        let spiral = (angle * 3.0 + radius * 15.0 + self.time * 2.0).sin();
-                        tensor[y][x] = spiral * (1.0 - radius).max(0.0);
-                    }
-                }
-            }
-            
-            VisualizationMode::TensorStorm => {
-                // Chaotic patterns - neural storms
-                for y in 0..TENSOR_SIZE {
-                    for x in 0..TENSOR_SIZE {
-                        let x_norm = x as f32 / TENSOR_SIZE as f32;
-                        let y_norm = y as f32 / TENSOR_SIZE as f32;
-                        let chaos1 = (x_norm * 25.0 + y_norm * 30.0 + self.time * 7.0).sin();
-                        let chaos2 = (x_norm * 33.0 - y_norm * 28.0 - self.time * 5.0).cos();
-                        let chaos3 = ((x_norm + y_norm) * 40.0 + self.time * 3.0).sin();
-                        let modulation = (self.time * 1.5).cos();
-                        tensor[y][x] = (chaos1 * chaos2 + chaos3) * (1.0 + modulation * 0.8);
-                    }
-                }
-            }
-            
-            VisualizationMode::PlasmaField => {
-                // Electromagnetic field patterns
-                for y in 0..TENSOR_SIZE {
-                    for x in 0..TENSOR_SIZE {
-                        let x_norm = x as f32 / TENSOR_SIZE as f32;
-                        let y_norm = y as f32 / TENSOR_SIZE as f32;
-                        let plasma1 = (x_norm * 20.0 + self.time * 4.0).sin();
-                        let plasma2 = (y_norm * 18.0 - self.time * 3.0).cos();
-                        let interference = ((x_norm + y_norm) * 30.0 + self.time * 6.0).sin() * 0.5;
-                        tensor[y][x] = plasma1 + plasma2 + interference;
-                    }
-                }
-            }
-            
-            VisualizationMode::QuantumRipples => {
-                // Quantum field fluctuations
-                for y in 0..TENSOR_SIZE {
-                    for x in 0..TENSOR_SIZE {
-                        let x_center = x as f32 / TENSOR_SIZE as f32 - 0.5;
-                        let y_center = y as f32 / TENSOR_SIZE as f32 - 0.5;
-                        let distance = (x_center.powi(2) + y_center.powi(2)).sqrt();
-                        let ripple = (distance * 25.0 - self.time * 5.0).sin();
-                        let decay = (-distance * 6.0).exp();
-                        tensor[y][x] = ripple * decay;
-                    }
-                }
-            }
-            
-            VisualizationMode::HypnoticMandalas => {
-                // Sacred geometry meets neural nets
-                for y in 0..TENSOR_SIZE {
-                    for x in 0..TENSOR_SIZE {
-                        let x_center = x as f32 / TENSOR_SIZE as f32 - 0.5;
-                        let y_center = y as f32 / TENSOR_SIZE as f32 - 0.5;
-                        let angle = y_center.atan2(x_center);
-                        let radius = (x_center.powi(2) + y_center.powi(2)).sqrt();
-                        let mandala1 = (angle * 8.0 + self.time * 2.0).sin();
-                        let mandala2 = (angle * 3.0 - self.time * 1.5).cos();
-                        let mandala3 = (radius * 20.0 + self.time * 3.0).sin();
-                        tensor[y][x] = (mandala1 + mandala2 * 0.7 + mandala3 * 0.4) * (1.0 - radius * 0.5).max(0.0);
-                    }
-                }
-            }
-        }
-        
-        tensor
+    fn generate_2d_tensor(&self, mode: VisualizationMode) -> Tensor<NdArray<f32>, 2> {
+        // Not used in pipeline mode
+        panic!("generate_2d_tensor is not used in pipeline mode");
     }
-    
-    fn render_tensor_to_cell(&mut self, tensor: &[Vec<f32>], grid_x: usize, grid_y: usize) {
-        let start_x = grid_x * CELL_WIDTH;
-        let start_y = grid_y * CELL_HEIGHT;
-        
-        // Scale factors to fit tensor into grid cell
+    fn render_tensor_data_to_cell(&mut self, tensor_data: &Vec<f32>, grid_x: usize, grid_y: usize) {
+        let start_x = grid_x * (CELL_WIDTH + CELL_MARGIN) + CELL_MARGIN;
+        let start_y = grid_y * (CELL_HEIGHT + CELL_MARGIN) + CELL_MARGIN;
         let scale_x = CELL_WIDTH as f32 / TENSOR_SIZE as f32;
         let scale_y = CELL_HEIGHT as f32 / TENSOR_SIZE as f32;
-        
         for y in 0..CELL_HEIGHT {
             for x in 0..CELL_WIDTH {
                 let screen_x = start_x + x;
                 let screen_y = start_y + y;
-                
                 if screen_x < WINDOW_WIDTH && screen_y < WINDOW_HEIGHT {
-                    // Map cell coordinates to tensor coordinates
                     let tensor_x = ((x as f32 / scale_x) as usize).min(TENSOR_SIZE - 1);
                     let tensor_y = ((y as f32 / scale_y) as usize).min(TENSOR_SIZE - 1);
-                    
-                    let mut value = tensor[tensor_y][tensor_x];
-                    
-                    // Apply tensor operation for additional effects
-                    value = match self.current_operation {
-                        TensorOperation::Sum => value * 1.5, // Amplify
-                        TensorOperation::Max => value.max(0.0) * 2.0, // Positive amplify
-                        TensorOperation::Min => value.min(0.0) * 2.0, // Negative amplify  
-                        TensorOperation::Mean => value * 0.8, // Smooth
-                    };
-                    
-                    // Add neural wave effects
-                    let wave_x = ((screen_x as f32) * 0.02 + self.time * 3.0).sin() * 0.3;
-                    let wave_y = ((screen_y as f32) * 0.03 - self.time * 2.0).cos() * 0.2;
-                    let interference = ((screen_x as f32 + screen_y as f32) * 0.01 + self.time * 1.5).sin() * 0.15;
-                    
-                    let modulated_value = value + wave_x + wave_y + interference;
-                    let color = self.tensor_to_color(modulated_value);
-                    
+                    let idx = tensor_y * TENSOR_SIZE + tensor_x;
+                    let value = tensor_data[idx];
+                    let color = self.tensor_to_color(value);
                     self.buffer[screen_y * WINDOW_WIDTH + screen_x] = color;
                 }
             }
