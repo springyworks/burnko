@@ -1,0 +1,17 @@
+[package]
+name = "realtime-tensor-viz"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = ["burn/wgpu"]
+ndarray = ["burn/ndarray"]
+wgpu = ["burn/wgpu"]
+
+[dependencies]
+burn = { path = "../../crates/burn", features = ["ndarray", "wgpu", "std"] }
+
+# For visualization
+minifb = "0.25"

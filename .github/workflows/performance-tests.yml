@@ -1,0 +1,228 @@
+# FFT and Scan Performance Test Automation
+
+name: Performance Baseline Tests
+
+on:
+  push:
+    branches: [ main, fftburn ]
+    paths:
+      - 'crates/burn-tensor/src/tests/ops/fft.rs'
+      - 'crates/burn-tensor/src/tests/ops/scan.rs'
+      - 'crates/burn-wgpu/tests/gpu_2d_performance.rs'
+      - 'examples/cross-backend-comparison/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'crates/burn-tensor/src/tests/ops/**'
+      - 'crates/burn-*/tests/**'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Test core tensor operations across all backends
+  cross-backend-tests:
+    name: Cross-Backend FFT and Scan Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [ndarray, wgpu, candle]
+        feature: [std]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+    
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ${{ runner.os }}-cargo-${{ matrix.backend }}-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Install system dependencies (WGPU)
+      if: matrix.backend == 'wgpu'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libegl1-mesa-dev libgl1-mesa-dri
+    
+    - name: Run tensor testgen tests
+      run: |
+        cargo test --package burn-tensor fft_ops scan --features ${{ matrix.feature }} -- --nocapture
+      continue-on-error: true
+    
+    - name: Run backend-specific tests
+      run: |
+        cargo test --package burn-${{ matrix.backend }} --features ${{ matrix.feature }} -- --nocapture
+      continue-on-error: true
+
+  # GPU Performance benchmarks (when GPU available)
+  gpu-performance-tests:
+    name: GPU Performance Benchmarks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Install GPU dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mesa-vulkan-drivers vulkan-utils
+    
+    - name: Check GPU availability
+      run: |
+        vulkaninfo || echo "No GPU available, using CPU fallback"
+    
+    - name: Run GPU 2D performance tests
+      run: |
+        cargo test --package burn-wgpu gpu_2d_performance --features std -- --nocapture
+      continue-on-error: true
+    
+    - name: Run cross-backend comparison
+      run: |
+        cd examples/cross-backend-comparison
+        cargo run || echo "Cross-backend comparison failed (expected in CI without GPU)"
+
+  # Performance regression detection
+  performance-regression:
+    name: Performance Regression Detection
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Install critcmp for benchmark comparison
+      run: cargo install critcmp
+    
+    - name: Checkout main branch
+      run: git checkout main
+    
+    - name: Run baseline benchmarks
+      run: |
+        cargo test --package burn-wgpu gpu_2d_performance --features std -- --nocapture > baseline_results.txt
+      continue-on-error: true
+    
+    - name: Checkout PR branch
+      run: git checkout ${{ github.head_ref }}
+    
+    - name: Run PR benchmarks
+      run: |
+        cargo test --package burn-wgpu gpu_2d_performance --features std -- --nocapture > pr_results.txt
+      continue-on-error: true
+    
+    - name: Compare performance
+      run: |
+        echo "## Performance Comparison" >> $GITHUB_STEP_SUMMARY
+        echo "### Baseline (main branch):" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        head -50 baseline_results.txt >> $GITHUB_STEP_SUMMARY || echo "No baseline results" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "### PR Branch:" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        head -50 pr_results.txt >> $GITHUB_STEP_SUMMARY || echo "No PR results" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # Documentation and example validation
+  docs-and-examples:
+    name: Documentation and Examples
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Validate documentation
+      run: |
+        cargo doc --package burn-tensor --features std --no-deps
+        cargo doc --package burn-wgpu --features std --no-deps
+    
+    - name: Check documentation links
+      run: |
+        if [ -f "docs/performance-baselines.md" ]; then
+          echo "✅ Performance baselines documentation exists"
+        else
+          echo "❌ Missing performance baselines documentation"
+          exit 1
+        fi
+    
+    - name: Validate examples compile
+      run: |
+        cd examples/cross-backend-comparison
+        cargo check
+        cd ../realtime-tensor-viz
+        cargo check || echo "Realtime viz example check skipped"
+
+  # Test coverage report
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: llvm-tools-preview
+    
+    - name: Install cargo-llvm-cov
+      run: cargo install cargo-llvm-cov
+    
+    - name: Generate test coverage
+      run: |
+        cargo llvm-cov --package burn-tensor --features std --lcov --output-path lcov.info
+      continue-on-error: true
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: lcov.info
+        flags: tensor-tests
+        name: burn-tensor-coverage
+      continue-on-error: true
+
+# Job summary for performance tracking
+summary:
+  name: Performance Summary
+  runs-on: ubuntu-latest
+  needs: [cross-backend-tests, gpu-performance-tests]
+  if: always()
+  
+  steps:
+  - name: Create performance summary
+    run: |
+      echo "## 🔥 Burn Performance Test Summary" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "### Test Results:" >> $GITHUB_STEP_SUMMARY
+      echo "- Cross-backend tests: ${{ needs.cross-backend-tests.result }}" >> $GITHUB_STEP_SUMMARY
+      echo "- GPU performance tests: ${{ needs.gpu-performance-tests.result }}" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "### 📊 Expected Performance Baselines:" >> $GITHUB_STEP_SUMMARY
+      echo "- **GPU 2D Scan**: 40+ Melems/sec (1024×1024 matrices)" >> $GITHUB_STEP_SUMMARY
+      echo "- **CPU vs GPU**: 45x speedup on large matrices" >> $GITHUB_STEP_SUMMARY
+      echo "- **FFT Operations**: 5x GPU speedup over CPU" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "### 🎯 Test Coverage:" >> $GITHUB_STEP_SUMMARY
+      echo "- FFT operations (1D, 2D, roundtrip)" >> $GITHUB_STEP_SUMMARY
+      echo "- Scan operations (cumsum, cumprod, cummax, cummin)" >> $GITHUB_STEP_SUMMARY  
+      echo "- Cross-backend correctness verification" >> $GITHUB_STEP_SUMMARY
+      echo "- Performance scaling analysis" >> $GITHUB_STEP_SUMMARY

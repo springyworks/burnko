@@ -23,6 +23,7 @@ mod div;
 mod erf;
 mod exp;
 mod expand;
+mod fft;
 mod finite;
 mod flatten;
 mod flip;

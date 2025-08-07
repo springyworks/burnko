@@ -129,10 +129,24 @@ where
 
     // Use Burn's standard parallel pattern - same as conv.rs
     // This works for multi-dimensional arrays where we have multiple independent lanes
-    run_par!(|| {
-        iter_par!(array.axis_iter_mut(axis))
-            .enumerate()
-            .for_each(|(lane_idx, mut lane)| {
+    // 
+    // CRITICAL FIX: For cumsum along axis `dim`, we iterate over the ORTHOGONAL direction
+    // to get independent lanes that each contain the cumsum axis.
+    // 
+    // Example for 2D: [[1,2],[3,4]]
+    // - cumsum(axis=0): accumulate down columns → iterate over axis 1 (columns) 
+    // - cumsum(axis=1): accumulate across rows → iterate over axis 0 (rows)
+    //
+    // For higher dimensions, we need to iterate over all axes EXCEPT the cumsum axis
+    
+    if array.ndim() == 2 {
+        // 2D case: iterate over the orthogonal axis
+        let iter_axis = if axis.index() == 0 { Axis(1) } else { Axis(0) };
+        
+        run_par!(|| {
+            iter_par!(array.axis_iter_mut(iter_axis))
+                .enumerate()
+                .for_each(|(lane_idx, mut lane)| {
                 // Handle both contiguous and non-contiguous cases
                 if let Some(slice) = lane.as_slice_mut() {
                     // Fast path for contiguous slices
@@ -161,7 +175,12 @@ where
                     // Could add logging here: first lane of large parallel operation
                 }
             });
-    });
+        });
+    } else {
+        // For higher dimensions (3D+), fall back to ndarray's implementation
+        // TODO: Implement proper multi-dimensional parallel iteration for N-D tensors
+        array.accumulate_axis_inplace(axis, |&prev, curr| *curr = *curr + prev);
+    }
 }
 
 /// In-place parallel cumulative product using Burn's parallel infrastructure

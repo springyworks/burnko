@@ -90,6 +90,12 @@ pub fn gpu_scan_serial<R: CubeRuntime, E: CubeElement>(
     let scan_dim = config.dim;
     let scan_dim_size = tensor.shape.dims[scan_dim];
     let total_elements = tensor.shape.num_elements();
+    
+    // Handle empty tensors
+    if total_elements == 0 || scan_dim_size == 0 {
+        return output;
+    }
+    
     let num_scan_lines = total_elements / scan_dim_size;
     
     // Set up kernel launch parameters
@@ -336,6 +342,12 @@ pub fn gpu_scan_parallel<R: CubeRuntime, E: CubeElement>(
     
     let scan_dim_size = tensor.shape.dims[config.dim];
     let total_elements = tensor.shape.num_elements();
+    
+    // Handle empty tensors
+    if total_elements == 0 || scan_dim_size == 0 {
+        return output;
+    }
+    
     let num_scan_lines = total_elements / scan_dim_size;
     
     let cube_dim = CubeDim::new(256u32, 1, 1);

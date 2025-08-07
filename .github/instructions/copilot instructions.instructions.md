@@ -1,0 +1,6 @@
+do not use superlatives , like professional and worldclass , ultra , stay humble we are not selling cars
+ Burn has a burn-tensor-testgen crate that generates tests. 
+ cleanup files that are not used anymore ; do a local commit first so we can revert
+ do not be so impatient , compiling can take some time; we are using rust and it is very safe and strict , in the long run it gives many advantages.
+ trippy YES! ; in fact this is my deeper motivation , burn deep learning and simulating disassociative drug effects, to me it is modulating energy, choas (near chaos), modulating damping, look at the sun and its planets , and also look at a cone-juggling (not magision work) and the dynmics of moving a live body , ther is /can be a link check embodied cognition , our brain started as a dancer , and dance we will. there are 500 neuro modulators , so room for experiments
+ can one run example by cwd to its location ;; maybe examples sould be ran from out of the root , ...root/: cargo run --examples ....
