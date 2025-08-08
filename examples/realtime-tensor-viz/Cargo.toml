@@ -9,6 +9,8 @@ publish = false
 default = ["burn/wgpu"]
 ndarray = ["burn/ndarray"]
 wgpu = ["burn/wgpu"]
+metrics-sysinfo = ["dep:sysinfo"]
+metrics-nvml = ["dep:nvml-wrapper"]
 
 [lib]
 name = "realtime_tensor_viz"
@@ -22,10 +24,15 @@ path = "examples/realtime-tensor-viz.rs"
 name = "realtime-tensor-viz-egui"
 path = "examples/realtime-tensor-viz-egui.rs"
 
+[[example]]
+name = "metrics-debug"
+path = "examples/metrics-debug.rs"
+
 [dependencies]
 burn = { path = "../../crates/burn", features = ["ndarray", "wgpu", "std"] }
 rayon = "1"
-# Egui/eframe for experimental UI
 eframe = { version = "0.27", default-features = true, features = ["wgpu"] }
-# For visualization
+egui_plot = "0.27"
+sysinfo = { version = "0.30", optional = true }
+nvml-wrapper = { version = "0.9", optional = true }
 minifb = "0.25"
