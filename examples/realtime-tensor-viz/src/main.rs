@@ -24,7 +24,7 @@ use std::sync::{Arc, Mutex};
 const GRID_COLS: usize = 3;
 const GRID_ROWS: usize = 2;
 const CELL_MARGIN: usize = 8;
-const GRID_TENSOR_SIZE: usize = 64; // 64x64 tensors for grid view
+const GRID_TENSOR_SIZE: usize = 128; // was 64; larger tensors for higher detail
 const CELL_WIDTH: usize = (WINDOW_WIDTH - (GRID_COLS + 1) * CELL_MARGIN) / GRID_COLS;
 const CELL_HEIGHT: usize = (WINDOW_HEIGHT - (GRID_ROWS + 1) * CELL_MARGIN) / GRID_ROWS;
 
@@ -574,6 +574,9 @@ impl PsychedelicTensorVisualizer {
 }
 
 fn main() {
+    // Ensure Rayon global pool has at least 2 threads for NdArray backend
+    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2).max(2);
+    let _ = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global();
     println!("🔥🌀 Starting Burn 6-Tensor Pipeline Visualizer 🌀🔥");
     println!("Initializing backends...");
     let mut visualizer = PsychedelicTensorVisualizer::new();

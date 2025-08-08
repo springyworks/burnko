@@ -18,8 +18,14 @@ path = "src/lib.rs"
 name = "realtime-tensor-viz"
 path = "examples/realtime-tensor-viz.rs"
 
+[[example]]
+name = "realtime-tensor-viz-egui"
+path = "examples/realtime-tensor-viz-egui.rs"
+
 [dependencies]
 burn = { path = "../../crates/burn", features = ["ndarray", "wgpu", "std"] }
-
+rayon = "1"
+# Egui/eframe for experimental UI
+eframe = { version = "0.27", default-features = true, features = ["wgpu"] }
 # For visualization
 minifb = "0.25"
