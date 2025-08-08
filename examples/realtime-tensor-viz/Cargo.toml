@@ -10,6 +10,14 @@ default = ["burn/wgpu"]
 ndarray = ["burn/ndarray"]
 wgpu = ["burn/wgpu"]
 
+[lib]
+name = "realtime_tensor_viz"
+path = "src/lib.rs"
+
+[[example]]
+name = "realtime-tensor-viz"
+path = "examples/realtime-tensor-viz.rs"
+
 [dependencies]
 burn = { path = "../../crates/burn", features = ["ndarray", "wgpu", "std"] }
 
