@@ -36,6 +36,10 @@ mod viz {
         HypnoticMandalas,
     }
 
+    // New: ripple modes
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum RippleMode { Analytic, Stateful }
+
     impl VisualizationMode {
         fn name(self) -> &'static str {
             match self {
@@ -68,6 +72,16 @@ mod viz {
         performance_stats: Arc<Mutex<PerformanceStats>>,
         grid_tensors_gpu: Vec<Tensor<GpuBackend, 2>>,
         grid_tensors_cpu: Vec<Tensor<CpuBackend, 2>>,
+        // New: ripple infra
+        ripple_mode: RippleMode,
+        gain_ripple: f32,
+        gain_feedback: f32,
+        coords_gpu_x: Tensor<GpuBackend, 2>,
+        coords_gpu_y: Tensor<GpuBackend, 2>,
+        coords_cpu_x: Tensor<CpuBackend, 2>,
+        coords_cpu_y: Tensor<CpuBackend, 2>,
+        ripple_state_gpu: Tensor<GpuBackend, 2>,
+        ripple_state_cpu: Tensor<CpuBackend, 2>,
     }
 
     impl Visualizer {
@@ -93,6 +107,16 @@ mod viz {
             let t0_cpu: Tensor<CpuBackend, 2> = Tensor::random([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE], Distribution::Default, &cpu_device);
             for _ in 0..6 { grid_tensors_cpu.push(t0_cpu.clone()); }
 
+            // Build static coordinate fields on each backend [0,1] range
+            let (coords_gpu_x, coords_gpu_y) = Self::build_coords_gpu(&gpu_device);
+            let (coords_cpu_x, coords_cpu_y) = Self::build_coords_cpu(&cpu_device);
+
+            // Ripple states (zero)
+            let zero_gpu = Tensor::<GpuBackend, 2>::from_floats(&vec![0.0; GRID_TENSOR_SIZE * GRID_TENSOR_SIZE], &gpu_device)
+                .reshape([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE]);
+            let zero_cpu = Tensor::<CpuBackend, 2>::from_floats(&vec![0.0; GRID_TENSOR_SIZE * GRID_TENSOR_SIZE], &cpu_device)
+                .reshape([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE]);
+
             Self {
                 window,
                 buffer,
@@ -108,7 +132,88 @@ mod viz {
                 performance_stats: Arc::new(Mutex::new(PerformanceStats::new())),
                 grid_tensors_gpu,
                 grid_tensors_cpu,
+                ripple_mode: RippleMode::Analytic,
+                gain_ripple: 0.7,
+                gain_feedback: 0.6,
+                coords_gpu_x,
+                coords_gpu_y,
+                coords_cpu_x,
+                coords_cpu_y,
+                ripple_state_gpu: zero_gpu,
+                ripple_state_cpu: zero_cpu,
             }
+        }
+
+        fn build_coords_gpu(device: &GpuDevice) -> (Tensor<GpuBackend, 2>, Tensor<GpuBackend, 2>) {
+            let w = GRID_TENSOR_SIZE;
+            let h = GRID_TENSOR_SIZE;
+            let mut xs = Vec::with_capacity(w * h);
+            let mut ys = Vec::with_capacity(w * h);
+            for j in 0..h {
+                for i in 0..w {
+                    xs.push(i as f32 / (w - 1) as f32);
+                    ys.push(j as f32 / (h - 1) as f32);
+                }
+            }
+            let x = Tensor::<GpuBackend, 2>::from_floats(&xs, device).reshape([h, w]);
+            let y = Tensor::<GpuBackend, 2>::from_floats(&ys, device).reshape([h, w]);
+            (x, y)
+        }
+        fn build_coords_cpu(device: &CpuDevice) -> (Tensor<CpuBackend, 2>, Tensor<CpuBackend, 2>) {
+            let w = GRID_TENSOR_SIZE;
+            let h = GRID_TENSOR_SIZE;
+            let mut xs = Vec::with_capacity(w * h);
+            let mut ys = Vec::with_capacity(w * h);
+            for j in 0..h {
+                for i in 0..w {
+                    xs.push(i as f32 / (w - 1) as f32);
+                    ys.push(j as f32 / (h - 1) as f32);
+                }
+            }
+            let x = Tensor::<CpuBackend, 2>::from_floats(&xs, device).reshape([h, w]);
+            let y = Tensor::<CpuBackend, 2>::from_floats(&ys, device).reshape([h, w]);
+            (x, y)
+        }
+
+        // Analytic ripple on GPU
+        fn ripple_analytic_gpu(&self) -> Tensor<GpuBackend, 2> {
+            let cx = 0.5 + 0.25 * (self.time * 0.7).cos();
+            let cy = 0.5 + 0.25 * (self.time * 0.9).sin();
+            let k = 20.0;      // spatial frequency
+            let omega = 6.0;   // speed
+            let damping = 1.5; // radial damping
+            let amp = 1.0;
+            let dx = &self.coords_gpu_x - cx;
+            let dy = &self.coords_gpu_y - cy;
+            let r = (dx.clone() * dx + dy.clone() * dy).sqrt();
+            let phase = r.clone() * k - self.time * omega;
+            let env = (r * -damping).exp();
+            phase.sin() * env * amp
+        }
+        // Analytic ripple on CPU
+        fn ripple_analytic_cpu(&self) -> Tensor<CpuBackend, 2> {
+            let cx = 0.5 + 0.25 * (self.time * 0.7).cos();
+            let cy = 0.5 + 0.25 * (self.time * 0.9).sin();
+            let k = 20.0; let omega = 6.0; let damping = 1.5; let amp = 1.0;
+            let dx = &self.coords_cpu_x - cx;
+            let dy = &self.coords_cpu_y - cy;
+            let r = (dx.clone() * dx + dy.clone() * dy).sqrt();
+            let phase = r.clone() * k - self.time * omega;
+            let env = (r * -damping).exp();
+            phase.sin() * env * amp
+        }
+
+        // Stateful ripple: simple persistence filter driven by analytic seed
+        fn ripple_stateful_gpu(&mut self) -> Tensor<GpuBackend, 2> {
+            let drive = self.ripple_analytic_gpu();
+            // u = 0.97*u + 0.03*drive (device-side ops)
+            self.ripple_state_gpu = self.ripple_state_gpu.clone() * 0.97 + drive * 0.03;
+            self.ripple_state_gpu.clone()
+        }
+        fn ripple_stateful_cpu(&mut self) -> Tensor<CpuBackend, 2> {
+            let drive = self.ripple_analytic_cpu();
+            self.ripple_state_cpu = self.ripple_state_cpu.clone() * 0.97 + drive * 0.03;
+            self.ripple_state_cpu.clone()
         }
 
         fn update_animation_state(&mut self) {
@@ -158,15 +263,20 @@ mod viz {
             let device = &self.gpu_device;
             let mut new_tensors = Vec::with_capacity(6);
             for i in 0..6 {
-                let input = if i == 0 { self.grid_tensors_gpu[5].clone() } else { self.grid_tensors_gpu[i - 1].clone() };
+                // Feedback source from previous frame
+                let feedback = if i == 0 { self.grid_tensors_gpu[5].clone() } else { self.grid_tensors_gpu[i - 1].clone() };
                 let t = match i {
-                    0 => input.abs(),
-                    1 => input * 0.8 + 0.2,
-                    2 => input.clamp_min(0.2).clamp_max(0.8),
-                    3 => input * -1.0 + 1.0,
-                    4 => input + Tensor::<GpuBackend, 2>::random([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE], Distribution::Default, device) * 0.1,
-                    5 => input * ((self.time as f32).sin() + 1.1),
-                    _ => input,
+                    // T1 = gain_ripple * ripple + gain_feedback * feedback
+                    0 => {
+                        let ripple = if self.ripple_mode == RippleMode::Analytic { self.ripple_analytic_gpu() } else { self.ripple_stateful_gpu() };
+                        ripple * self.gain_ripple + feedback * self.gain_feedback
+                    }
+                    1 => feedback * 0.8 + 0.2,
+                    2 => feedback.clamp_min(0.2).clamp_max(0.8),
+                    3 => feedback * -1.0 + 1.0,
+                    4 => feedback + Tensor::<GpuBackend, 2>::random([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE], Distribution::Default, device) * 0.1,
+                    5 => feedback * ((self.time as f32).sin() + 1.1),
+                    _ => feedback,
                 };
                 new_tensors.push(t);
             }
@@ -178,41 +288,22 @@ mod viz {
             let device = &self.cpu_device;
             let mut new_tensors = Vec::with_capacity(6);
             for i in 0..6 {
-                let input = if i == 0 { self.grid_tensors_cpu[5].clone() } else { self.grid_tensors_cpu[i - 1].clone() };
+                let feedback = if i == 0 { self.grid_tensors_cpu[5].clone() } else { self.grid_tensors_cpu[i - 1].clone() };
                 let t = match i {
-                    0 => input.abs(),
-                    1 => input * 0.8 + 0.2,
-                    2 => input.clamp_min(0.2).clamp_max(0.8),
-                    3 => input * -1.0 + 1.0,
-                    4 => input + Tensor::<CpuBackend, 2>::random([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE], Distribution::Default, device) * 0.1,
-                    5 => input * ((self.time as f32).sin() + 1.1),
-                    _ => input,
+                    0 => {
+                        let ripple = if self.ripple_mode == RippleMode::Analytic { self.ripple_analytic_cpu() } else { self.ripple_stateful_cpu() };
+                        ripple * self.gain_ripple + feedback * self.gain_feedback
+                    }
+                    1 => feedback * 0.8 + 0.2,
+                    2 => feedback.clamp_min(0.2).clamp_max(0.8),
+                    3 => feedback * -1.0 + 1.0,
+                    4 => feedback + Tensor::<CpuBackend, 2>::random([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE], Distribution::Default, device) * 0.1,
+                    5 => feedback * ((self.time as f32).sin() + 1.1),
+                    _ => feedback,
                 };
                 new_tensors.push(t);
             }
             self.grid_tensors_cpu = new_tensors;
-        }
-
-        fn render_six_tensor_grid(&mut self) {
-            // Clear buffer
-            self.buffer.fill(0);
-
-            if self.use_gpu {
-                self.update_grid_pipeline_gpu();
-                let tensor_datas: Vec<Vec<f32>> = self.grid_tensors_gpu.iter()
-                    .map(|t| t.to_data().as_slice().expect("to_data failed").to_vec())
-                    .collect();
-                for i in 0..6 { self.draw_cell(&tensor_datas[i], i); }
-            } else {
-                self.update_grid_pipeline_cpu();
-                let tensor_datas: Vec<Vec<f32>> = self.grid_tensors_cpu.iter()
-                    .map(|t| t.to_data().as_slice().expect("to_data failed").to_vec())
-                    .collect();
-                for i in 0..6 { self.draw_cell(&tensor_datas[i], i); }
-            }
-
-            self.window.update_with_buffer(&self.buffer, WINDOW_WIDTH, WINDOW_HEIGHT)
-                .expect("Failed to update window");
         }
 
         fn handle_input(&mut self) {
@@ -222,6 +313,16 @@ mod viz {
                 self.use_gpu = !self.use_gpu;
                 println!("Backend: {}", if self.use_gpu { "GPU (WGPU)" } else { "CPU (NdArray)" });
             }
+            // Ripple mode toggle
+            if self.window.is_key_pressed(Key::R, minifb::KeyRepeat::No) {
+                self.ripple_mode = if self.ripple_mode == RippleMode::Analytic { RippleMode::Stateful } else { RippleMode::Analytic };
+                println!("Ripple Mode: {:?}", self.ripple_mode);
+            }
+            // Gains
+            if self.window.is_key_down(Key::Z) { self.gain_ripple = (self.gain_ripple - 0.01).max(0.0); }
+            if self.window.is_key_down(Key::X) { self.gain_ripple = (self.gain_ripple + 0.01).min(2.0); }
+            if self.window.is_key_down(Key::C) { self.gain_feedback = (self.gain_feedback - 0.01).max(0.0); }
+            if self.window.is_key_down(Key::V) { self.gain_feedback = (self.gain_feedback + 0.01).min(2.0); }
             // Controls similar to previous impl
             if self.window.is_key_down(Key::Up) { self.animation_speed = (self.animation_speed * 1.05).min(5.0); }
             if self.window.is_key_down(Key::Down) { self.animation_speed = (self.animation_speed * 0.95).max(0.1); }
@@ -229,21 +330,39 @@ mod viz {
             if self.window.is_key_down(Key::Right) { self.intensity_multiplier = (self.intensity_multiplier * 1.02).min(3.0); }
             if self.window.is_key_down(Key::PageUp) { self.wave_complexity = (self.wave_complexity * 1.02).min(3.0); }
             if self.window.is_key_down(Key::PageDown) { self.wave_complexity = (self.wave_complexity * 0.98).max(0.1); }
-            if self.window.is_key_pressed(Key::Space, minifb::KeyRepeat::No) { self.print_status(); }
+            if self.window.is_key_pressed(Key::Space, minifb::KeyRepeat::No) { self.print_status(); self.print_help(); }
+            if self.window.is_key_pressed(Key::H, minifb::KeyRepeat::No) { self.print_help(); }
         }
 
         fn print_status(&self) {
             println!("\n🌀 6-Tensor Pipeline Status 🌀");
             println!("Backend: {}", if self.use_gpu { "GPU (WGPU)" } else { "CPU (NdArray)" });
+            println!("Ripple Mode: {:?}", self.ripple_mode);
+            println!("Gains: ripple={:.2}, feedback={:.2}", self.gain_ripple, self.gain_feedback);
             println!("Animation Speed: {:.2}x", self.animation_speed);
             println!("Intensity: {:.2}", self.intensity_multiplier);
             println!("Wave Complexity: {:.2}", self.wave_complexity);
+        }
+
+        fn print_help(&self) {
+            println!("\nKeys:");
+            println!("  Esc        : Exit");
+            println!("  G          : Toggle backend (CPU/NdArray ↔ GPU/WGPU)");
+            println!("  R          : Toggle ripple mode (Analytic ↔ Stateful)");
+            println!("  Z / X      : Decrease / Increase ripple gain");
+            println!("  C / V      : Decrease / Increase feedback gain");
+            println!("  ↑ / ↓      : Animation speed ±");
+            println!("  ← / →      : Intensity ±");
+            println!("  PgUp/PgDn  : Wave complexity ±");
+            println!("  Space / H  : Print status/help");
+            println!("Display: 3x2 panes (T1..T6 left→right, top→bottom); T6 feeds back into T1.");
         }
 
         pub fn run_loop(&mut self) {
             println!("🔥🌀 Starting Burn 6-Tensor Pipeline Visualizer 🌀🔥");
             println!("Ready. Press G to switch backend, Esc to exit.");
             self.print_status();
+            self.print_help();
             while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
                 self.handle_input();
                 self.update_animation_state();

@@ -1,0 +1,80 @@
+<mxfile host="app.diagrams.net" modified="2025-08-08T12:00:00.000Z" agent="drawio-desktop" version="23.1.5" type="device">
+  <diagram id="KxHh7d8s2ZfN3" name="TensorViz Architecture">
+    <mxGraphModel dx="1324" dy="832" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- SysML Block: Visualizer -->
+        <mxCell id="b_visualizer" value="&lt;&lt;block&gt;&gt;&lt;br/&gt;&lt;b&gt;Visualizer&lt;/b&gt;&lt;hr/&gt;run_loop(), handle_input(), update_animation_state()" style="whiteSpace=wrap;html=1;rounded=0;strokeColor=#000000;fillColor=#ffffff;align=left;verticalAlign=top;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="80" width="240" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- SysML Block: Window (minifb) -->
+        <mxCell id="b_window" value="&lt;&lt;block&gt;&gt;&lt;br/&gt;&lt;b&gt;Window&lt;/b&gt;&lt;br/&gt;(minifb)&lt;hr/&gt;update_with_buffer()" style="whiteSpace=wrap;html=1;rounded=0;strokeColor=#000000;fillColor=#ffffff;align=left;verticalAlign=top;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="440" y="80" width="240" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- SysML Block: Renderer -->
+        <mxCell id="b_renderer" value="&lt;&lt;block&gt;&gt;&lt;br/&gt;&lt;b&gt;Renderer&lt;/b&gt;&lt;hr/&gt;buffer: Vec&lt;u32&gt;\nrender_six_tensor_grid()\ndraw_cell()" style="whiteSpace=wrap;html=1;rounded=0;strokeColor=#000000;fillColor=#ffffff;align=left;verticalAlign=top;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="260" y="260" width="240" height="150" as="geometry"/>
+        </mxCell>
+
+        <!-- SysML Block: Color Mapper -->
+        <mxCell id="b_colormap" value="&lt;&lt;block&gt;&gt;&lt;br/&gt;&lt;b&gt;ColorMapper&lt;/b&gt;&lt;hr/&gt;tensor_to_color(value: f32)" style="whiteSpace=wrap;html=1;rounded=0;strokeColor=#000000;fillColor=#ffffff;align=left;verticalAlign=top;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="20" y="260" width="220" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- SysML Block: Backend Abstraction -->
+        <mxCell id="b_backend" value="&lt;&lt;block&gt;&gt;&lt;br/&gt;&lt;b&gt;Backend&lt;/b&gt;&lt;hr/&gt;NdArray&lt;f32&gt; / Wgpu&lt;f32&gt;\nNdArrayDevice / WgpuDevice\nG key toggles" style="whiteSpace=wrap;html=1;rounded=0;strokeColor=#000000;fillColor=#ffffff;align=left;verticalAlign=top;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="700" y="80" width="260" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- SysML Block: Grid Pipeline (6 tensors, closed loop) -->
+        <mxCell id="b_pipeline" value="&lt;&lt;block&gt;&gt;&lt;br/&gt;&lt;b&gt;GridPipeline&lt;/b&gt;&lt;hr/&gt;T[6]: 64x64 tensors\nops: abs, affine, clamp, invert, noise, gain(t)\nfeedback: T6 → T1" style="whiteSpace=wrap;html=1;rounded=0;strokeColor=#000000;fillColor=#ffffff;align=left;verticalAlign=top;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="700" y="260" width="300" height="170" as="geometry"/>
+        </mxCell>
+
+        <!-- SysML Block: Input Handler -->
+        <mxCell id="b_input" value="&lt;&lt;block&gt;&gt;&lt;br/&gt;&lt;b&gt;Input&lt;/b&gt;&lt;br/&gt;(minifb::Key)&lt;hr/&gt;G toggle backend\nArrows intensity/speed\nSpace status" style="whiteSpace=wrap;html=1;rounded=0;strokeColor=#000000;fillColor=#ffffff;align=left;verticalAlign=top;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="460" width="240" height="150" as="geometry"/>
+        </mxCell>
+
+        <!-- SysML Block: Animator -->
+        <mxCell id="b_anim" value="&lt;&lt;block&gt;&gt;&lt;br/&gt;&lt;b&gt;Animator&lt;/b&gt;&lt;hr/&gt;time: f32\nspeed: f32\ncolor_phase: f32" style="whiteSpace=wrap;html=1;rounded=0;strokeColor=#000000;fillColor=#ffffff;align=left;verticalAlign=top;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="380" y="460" width="240" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- Associations / Flows -->
+        <mxCell id="e_vis_to_rend" edge="1" parent="1" source="b_visualizer" target="b_renderer" style="endArrow=block;strokeColor=#000000;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rend_to_win" edge="1" parent="1" source="b_renderer" target="b_window" style="endArrow=block;strokeColor=#000000;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_color_to_rend" edge="1" parent="1" source="b_colormap" target="b_renderer" style="endArrow=block;dashed=1;strokeColor=#000000;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_vis_to_pipe" edge="1" parent="1" source="b_visualizer" target="b_pipeline" style="endArrow=block;strokeColor=#000000;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_backend_to_pipe" edge="1" parent="1" source="b_backend" target="b_pipeline" style="endArrow=block;strokeColor=#000000;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_anim_to_pipe" edge="1" parent="1" source="b_anim" target="b_pipeline" style="endArrow=block;dashed=1;strokeColor=#000000;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_input_to_vis" edge="1" parent="1" source="b_input" target="b_visualizer" style="endArrow=block;strokeColor=#000000;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Feedback loop on pipeline -->
+        <mxCell id="e_feedback" edge="1" parent="1" source="b_pipeline" target="b_pipeline" style="endArrow=block;strokeColor=#000000;curved=1;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="880" y="230" as="sourcePoint"/>
+            <mxPoint x="820" y="450" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

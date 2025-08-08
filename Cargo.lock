@@ -6702,14 +6702,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "psychedelic-tensors"
-version = "0.19.0"
-dependencies = [
- "burn",
- "minifb",
-]
-
-[[package]]
 name = "pulp"
 version = "0.18.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
