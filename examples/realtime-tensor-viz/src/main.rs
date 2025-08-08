@@ -14,16 +14,24 @@
 
 use burn::{
     tensor::{Tensor, backend::Backend},
-    backend::{ndarray::NdArray, wgpu::Wgpu},
+    backend::{ndarray::{NdArray, NdArrayDevice}, wgpu::{Wgpu, WgpuDevice}},
 };
 use minifb::{Key, Window, WindowOptions, Scale};
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
 
+// Add: grid constants for 6-tensor view
+const GRID_COLS: usize = 3;
+const GRID_ROWS: usize = 2;
+const CELL_MARGIN: usize = 8;
+const GRID_TENSOR_SIZE: usize = 64; // 64x64 tensors for grid view
+const CELL_WIDTH: usize = (WINDOW_WIDTH - (GRID_COLS + 1) * CELL_MARGIN) / GRID_COLS;
+const CELL_HEIGHT: usize = (WINDOW_HEIGHT - (GRID_ROWS + 1) * CELL_MARGIN) / GRID_ROWS;
+
 type CpuBackend = NdArray<f32>;
 type GpuBackend = Wgpu<f32>;
-type CpuDevice = <CpuBackend as Backend>::Device;
-type GpuDevice = <GpuBackend as Backend>::Device;
+type CpuDevice = NdArrayDevice;
+type GpuDevice = WgpuDevice;
 
 // Window and visualization constants
 const WINDOW_WIDTH: usize = 1200;
@@ -93,6 +101,13 @@ impl TensorOperation {
     }
 }
 
+// Add: view mode to merge both examples
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ViewMode {
+    SingleCanvas,
+    SixTensorGrid,
+}
+
 #[derive(Clone)]
 struct PerformanceStats {
     times: Vec<Duration>,
@@ -145,12 +160,16 @@ struct PsychedelicTensorVisualizer {
     wave_complexity: f32,
     
     performance_stats: Arc<Mutex<PerformanceStats>>,
+
+    // 6-tensor grid pipeline (both backends)
+    grid_tensors_gpu: Vec<Tensor<GpuBackend, 2>>,
+    grid_tensors_cpu: Vec<Tensor<CpuBackend, 2>>,
 }
 
 impl PsychedelicTensorVisualizer {
     fn new() -> Self {
         let mut window = Window::new(
-            "🔥 Burn Psychedelic Tensor Visualizer 🌀",
+            "🔥 Burn 6-Tensor Pipeline Visualizer 🌀",
             WINDOW_WIDTH,
             WINDOW_HEIGHT,
             WindowOptions {
@@ -163,8 +182,18 @@ impl PsychedelicTensorVisualizer {
         window.limit_update_rate(Some(std::time::Duration::from_micros(16600))); // ~60fps
         
         let buffer = vec![0; WINDOW_WIDTH * WINDOW_HEIGHT];
-        let cpu_device = CpuBackend::default();
-        let gpu_device = GpuBackend::default();
+        let cpu_device = CpuDevice::default();
+        let gpu_device = GpuDevice::default();
+        
+        // Initialize 6 grid tensors on both backends
+        use burn::tensor::Distribution;
+        let mut grid_tensors_gpu = Vec::with_capacity(6);
+        let t0_gpu: Tensor<GpuBackend, 2> = Tensor::random([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE], Distribution::Default, &gpu_device);
+        for _ in 0..6 { grid_tensors_gpu.push(t0_gpu.clone()); }
+
+        let mut grid_tensors_cpu = Vec::with_capacity(6);
+        let t0_cpu: Tensor<CpuBackend, 2> = Tensor::random([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE], Distribution::Default, &cpu_device);
+        for _ in 0..6 { grid_tensors_cpu.push(t0_cpu.clone()); }
         
         Self {
             window,
@@ -182,9 +211,11 @@ impl PsychedelicTensorVisualizer {
             intensity_multiplier: 1.0,
             wave_complexity: 1.0,
             performance_stats: Arc::new(Mutex::new(PerformanceStats::new())),
+            grid_tensors_gpu,
+            grid_tensors_cpu,
         }
     }
-    
+
     fn update_animation_state(&mut self) {
         self.time += 0.016 * self.animation_speed; // Assuming ~60fps
         self.color_phase += 0.02;
@@ -336,7 +367,7 @@ impl PsychedelicTensorVisualizer {
     
     fn apply_gpu_operation(&self, data: Vec<f32>) -> Vec<f32> {
         let tensor: Tensor<GpuBackend, 1> = 
-            Tensor::from_floats(data.as_slice(), &self.gpu_device)
+            Tensor::<GpuBackend, 1>::from_floats(data.as_slice(), &self.gpu_device)
                 .reshape([TENSOR_HEIGHT * TENSOR_WIDTH]);
         
         // Reshape to 2D for operations
@@ -356,7 +387,7 @@ impl PsychedelicTensorVisualizer {
     
     fn apply_cpu_operation(&self, data: Vec<f32>) -> Vec<f32> {
         let tensor: Tensor<CpuBackend, 1> = 
-            Tensor::from_floats(data.as_slice(), &self.cpu_device)
+            Tensor::<CpuBackend, 1>::from_floats(data.as_slice(), &self.cpu_device)
                 .reshape([TENSOR_HEIGHT * TENSOR_WIDTH]);
         
         // Reshape to 2D for operations
@@ -412,93 +443,115 @@ impl PsychedelicTensorVisualizer {
     fn render(&mut self) {
         // Update animation state
         self.update_animation_state();
-        
-        // Generate psychedelic tensor pattern
-        let tensor_data = self.generate_psychedelic_tensor(TENSOR_WIDTH, TENSOR_HEIGHT);
-        
-        // Apply tensor operations for additional effects
-        let processed_data = self.apply_tensor_operation(tensor_data);
-        
-        // Convert to colors and update buffer
-        for (i, &value) in processed_data.iter().enumerate() {
-            if i < self.buffer.len() {
-                self.buffer[i] = self.tensor_to_color(value);
-            }
+        self.render_six_tensor_grid();
+    }
+
+    fn render_six_tensor_grid(&mut self) {
+        // Clear buffer
+        self.buffer.fill(0);
+
+        if self.use_gpu {
+            self.update_grid_pipeline_gpu();
+            let tensor_datas: Vec<Vec<f32>> = self.grid_tensors_gpu.iter()
+                .map(|t| t.to_data().as_slice().expect("to_data failed").to_vec())
+                .collect();
+            for i in 0..6 { self.draw_cell(&tensor_datas[i], i); }
+        } else {
+            self.update_grid_pipeline_cpu();
+            let tensor_datas: Vec<Vec<f32>> = self.grid_tensors_cpu.iter()
+                .map(|t| t.to_data().as_slice().expect("to_data failed").to_vec())
+                .collect();
+            for i in 0..6 { self.draw_cell(&tensor_datas[i], i); }
         }
-        
-        // Update window
+
         self.window.update_with_buffer(&self.buffer, WINDOW_WIDTH, WINDOW_HEIGHT)
             .expect("Failed to update window");
     }
-    
+
+    fn draw_cell(&mut self, tensor_data: &Vec<f32>, idx: usize) {
+        let grid_x = idx % GRID_COLS;
+        let grid_y = idx / GRID_COLS;
+        let start_x = grid_x * (CELL_WIDTH + CELL_MARGIN) + CELL_MARGIN;
+        let start_y = grid_y * (CELL_HEIGHT + CELL_MARGIN) + CELL_MARGIN;
+        let scale_x = CELL_WIDTH as f32 / GRID_TENSOR_SIZE as f32;
+        let scale_y = CELL_HEIGHT as f32 / GRID_TENSOR_SIZE as f32;
+        for y in 0..CELL_HEIGHT {
+            for x in 0..CELL_WIDTH {
+                let screen_x = start_x + x;
+                let screen_y = start_y + y;
+                if screen_x < WINDOW_WIDTH && screen_y < WINDOW_HEIGHT {
+                    let tensor_x = ((x as f32 / scale_x) as usize).min(GRID_TENSOR_SIZE - 1);
+                    let tensor_y = ((y as f32 / scale_y) as usize).min(GRID_TENSOR_SIZE - 1);
+                    let i = tensor_y * GRID_TENSOR_SIZE + tensor_x;
+                    let value = tensor_data[i];
+                    self.buffer[screen_y * WINDOW_WIDTH + screen_x] = self.tensor_to_color(value);
+                }
+            }
+        }
+    }
+
+    fn update_grid_pipeline_gpu(&mut self) {
+        use burn::tensor::Distribution;
+        let device = &self.gpu_device;
+        let mut new_tensors = Vec::with_capacity(6);
+        for i in 0..6 {
+            let input = if i == 0 { self.grid_tensors_gpu[5].clone() } else { self.grid_tensors_gpu[i - 1].clone() };
+            let t = match i {
+                0 => input.abs(),
+                1 => input * 0.8 + 0.2,
+                2 => input.clamp_min(0.2).clamp_max(0.8),
+                3 => input * -1.0 + 1.0,
+                4 => input + Tensor::<GpuBackend, 2>::random([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE], Distribution::Default, device) * 0.1,
+                5 => input * ((self.time as f32).sin() + 1.1),
+                _ => input,
+            };
+            new_tensors.push(t);
+        }
+        self.grid_tensors_gpu = new_tensors;
+    }
+
+    fn update_grid_pipeline_cpu(&mut self) {
+        use burn::tensor::Distribution;
+        let device = &self.cpu_device;
+        let mut new_tensors = Vec::with_capacity(6);
+        for i in 0..6 {
+            let input = if i == 0 { self.grid_tensors_cpu[5].clone() } else { self.grid_tensors_cpu[i - 1].clone() };
+            let t = match i {
+                0 => input.abs(),
+                1 => input * 0.8 + 0.2,
+                2 => input.clamp_min(0.2).clamp_max(0.8),
+                3 => input * -1.0 + 1.0,
+                4 => input + Tensor::<CpuBackend, 2>::random([GRID_TENSOR_SIZE, GRID_TENSOR_SIZE], Distribution::Default, device) * 0.1,
+                5 => input * ((self.time as f32).sin() + 1.1),
+                _ => input,
+            };
+            new_tensors.push(t);
+        }
+        self.grid_tensors_cpu = new_tensors;
+    }
+
     fn handle_input(&mut self) {
-        if self.window.is_key_down(Key::Escape) {
-            std::process::exit(0);
-        }
-        
-        // Visualization mode controls
-        if self.window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
-            self.visualization_mode = VisualizationMode::PsychedelicWaves;
-        }
-        if self.window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
-            self.visualization_mode = VisualizationMode::CosmicSpiral;
-        }
-        if self.window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
-            self.visualization_mode = VisualizationMode::TensorStorm;
-        }
-        if self.window.is_key_pressed(Key::Key4, minifb::KeyRepeat::No) {
-            self.visualization_mode = VisualizationMode::PlasmaField;
-        }
-        if self.window.is_key_pressed(Key::Key5, minifb::KeyRepeat::No) {
-            self.visualization_mode = VisualizationMode::QuantumRipples;
-        }
-        if self.window.is_key_pressed(Key::Key6, minifb::KeyRepeat::No) {
-            self.visualization_mode = VisualizationMode::HypnoticMandalas;
-        }
-        
-        // Operation controls
-        if self.window.is_key_pressed(Key::S, minifb::KeyRepeat::No) {
-            self.current_operation = TensorOperation::Sum;
-        }
-        if self.window.is_key_pressed(Key::M, minifb::KeyRepeat::No) {
-            self.current_operation = TensorOperation::Max;
-        }
-        if self.window.is_key_pressed(Key::N, minifb::KeyRepeat::No) {
-            self.current_operation = TensorOperation::Min;
-        }
-        if self.window.is_key_pressed(Key::E, minifb::KeyRepeat::No) {
-            self.current_operation = TensorOperation::Mean;
-        }
+        if self.window.is_key_down(Key::Escape) { std::process::exit(0); }
         
         // Backend toggle
         if self.window.is_key_pressed(Key::G, minifb::KeyRepeat::No) {
             self.use_gpu = !self.use_gpu;
+            println!("Backend: {}", if self.use_gpu { "GPU (WGPU)" } else { "CPU (NdArray)" });
         }
         
-        // Auto-cycle toggles
-        if self.window.is_key_pressed(Key::A, minifb::KeyRepeat::No) {
-            self.auto_cycle_operations = !self.auto_cycle_operations;
-        }
-        if self.window.is_key_pressed(Key::V, minifb::KeyRepeat::No) {
-            self.auto_cycle_modes = !self.auto_cycle_modes;
-        }
-        
-        // Animation speed controls
+        // Visualization adjustments
         if self.window.is_key_down(Key::Up) {
             self.animation_speed = (self.animation_speed * 1.05).min(5.0);
         }
         if self.window.is_key_down(Key::Down) {
             self.animation_speed = (self.animation_speed * 0.95).max(0.1);
         }
-        
-        // Visual effect controls
         if self.window.is_key_down(Key::Left) {
             self.intensity_multiplier = (self.intensity_multiplier * 0.98).max(0.1);
         }
         if self.window.is_key_down(Key::Right) {
             self.intensity_multiplier = (self.intensity_multiplier * 1.02).min(3.0);
         }
-        
         if self.window.is_key_down(Key::PageUp) {
             self.wave_complexity = (self.wave_complexity * 1.02).min(3.0);
         }
@@ -506,56 +559,29 @@ impl PsychedelicTensorVisualizer {
             self.wave_complexity = (self.wave_complexity * 0.98).max(0.1);
         }
         
-        // Print current status
         if self.window.is_key_pressed(Key::Space, minifb::KeyRepeat::No) {
             self.print_status();
         }
     }
     
     fn print_status(&self) {
-        println!("\n🌀 Psychedelic Tensor Visualizer Status 🌀");
-        println!("Visualization Mode: {}", self.visualization_mode.name());
-        println!("Current Operation: {}", self.current_operation.name());
-        println!("Backend: {}", if self.use_gpu { "GPU (WGPU)" } else { "CPU" });
+        println!("\n🌀 6-Tensor Pipeline Status 🌀");
+        println!("Backend: {}", if self.use_gpu { "GPU (WGPU)" } else { "CPU (NdArray)" });
         println!("Animation Speed: {:.2}x", self.animation_speed);
         println!("Intensity: {:.2}", self.intensity_multiplier);
         println!("Wave Complexity: {:.2}", self.wave_complexity);
-        println!("Auto-cycle Operations: {}", self.auto_cycle_operations);
-        println!("Auto-cycle Modes: {}", self.auto_cycle_modes);
-        
-        if let Ok(stats) = self.performance_stats.try_lock() {
-            if let Some(avg) = stats.average_time() {
-                println!("Average Operation Time: {:.2}ms", avg.as_secs_f64() * 1000.0);
-            }
-        }
-        
-        println!("\nControls:");
-        println!("1-6: Switch visualization modes");
-        println!("S/M/N/E: Switch operations (Sum/Max/miN/mEan)");
-        println!("G: Toggle GPU/CPU backend");
-        println!("A: Toggle auto-cycle operations");
-        println!("V: Toggle auto-cycle visualization modes");
-        println!("↑↓: Animation speed, ←→: Intensity, PgUp/PgDn: Wave complexity");
-        println!("Space: Print status, Esc: Exit");
     }
 }
 
 fn main() {
-    println!("🔥🌀 Starting Burn Psychedelic Tensor Visualizer 🌀🔥");
-    println!("Initializing GPU backend and psychedelic patterns...");
-    
+    println!("🔥🌀 Starting Burn 6-Tensor Pipeline Visualizer 🌀🔥");
+    println!("Initializing backends...");
     let mut visualizer = PsychedelicTensorVisualizer::new();
-    
-    println!("🎨 Psychedelic Tensor Visualizer Ready! 🎨");
-    println!("Press SPACE for controls, ESC to exit");
-    
+    println!("Ready. Press G to switch backend, Esc to exit.");
     visualizer.print_status();
-    
-    // Main render loop
     while visualizer.window.is_open() && !visualizer.window.is_key_down(Key::Escape) {
         visualizer.handle_input();
         visualizer.render();
     }
-    
-    println!("✨ Thanks for exploring the psychedelic tensor dimension! ✨");
+    println!("✨ Bye!");
 }
